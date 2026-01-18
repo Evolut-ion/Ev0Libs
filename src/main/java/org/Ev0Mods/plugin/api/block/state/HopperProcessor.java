@@ -161,16 +161,15 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof ProcessingBenchState containerState) {
                 if(!containerState.getItemContainer().isEmpty()) {
                     if (!containerState.getItemContainer().getContainer(2).isEmpty()) {
-                        for (int i = 0; i < containerState.getItemContainer().getContainer(2).getCapacity(); i++){
+                        for (int i = 0; i < containerState.getItemContainer().getContainer(2).getCapacity()-1; i++){
                             if (containerState.getItemContainer().getContainer(2).getItemStack((short)i) != null) {
-                                HytaleLogger.getLogger().atInfo().log(containerState.getItemContainer().getContainer(2).getItemStack((short) 0).toString());
+                                HytaleLogger.getLogger().atInfo().log(containerState.getItemContainer().getContainer(2).getItemStack((short) i).toString());
 
-                                if (!this.itemContainer.isEmpty()) {
                                     ItemStackSlotTransaction t = this.itemContainer.addItemStackToSlot((short) 0, containerState.getItemContainer().getContainer(2).getItemStack((short) i).withQuantity(1));
                                     if (t.succeeded()) {
                                         containerState.getItemContainer().getContainer(2).removeItemStackFromSlot((short) i, 1);
                                     }
-                                }
+
                             }
                         }
                     }
