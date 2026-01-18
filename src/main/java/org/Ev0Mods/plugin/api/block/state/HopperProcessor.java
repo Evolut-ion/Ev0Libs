@@ -24,6 +24,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
 import com.hypixel.hytale.server.core.inventory.transaction.ItemStackSlotTransaction;
+import com.hypixel.hytale.server.core.inventory.transaction.Transaction;
 import com.hypixel.hytale.server.core.modules.collision.CollisionModule;
 import com.hypixel.hytale.server.core.modules.collision.CollisionResult;
 import com.hypixel.hytale.server.core.modules.entity.EntityModule;
@@ -69,6 +70,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
 
 
+
     @Override
     public boolean initialize(BlockType blockType) {
         if (super.initialize(blockType) && blockType.getState() instanceof Data data) {
@@ -104,10 +106,18 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             final WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(exportPos.x, exportPos.z));
             //LOGGER.atInfo().log(chunk.toString());
 
+
             if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof ItemContainerState containerState) {
                 if (!this.itemContainer.isEmpty())
-                    containerState.getItemContainer().addItemStackToSlot((short)0, this.getItemContainer().getItemStack((short)0).withQuantity(1));
-                    this.getItemContainer().removeItemStackFromSlot((short)0, 1);
+                    for(int n = 0; n< containerState.getItemContainer().getCapacity()-1; n++) {
+                        if(this.getItemContainer().getItemStack((short)0) != null && this.getItemContainer().getItemStack((short)0).getQuantity() <100) {
+                            ItemStackSlotTransaction t = containerState.getItemContainer().addItemStackToSlot((short) n, this.getItemContainer().getItemStack((short) 0).withQuantity(1));
+                            if (t.succeeded()) {
+
+                                this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
+                            }
+                        }
+                    }
             }
 
             if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof ProcessingBenchState containerState) {
@@ -115,11 +125,18 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                     if (!containerState.getItemContainer().getContainer(2).isEmpty()) {
                         HytaleLogger.getLogger().atInfo().log(containerState.getItemContainer().getContainer(2).getItemStack((short) 0).toString());
                     }
-                        containerState.getItemContainer().getContainer(0).addItemStackToSlot((short) 0, this.getItemContainer().getItemStack((short) 0).withQuantity(1));
-                        this.getItemContainer().removeItemStackFromSlot((short)0, 1);
-
-
+                    if(!containerState.getItemContainer().getContainer(0).isEmpty()) {
+                        if (containerState.getItemContainer().getContainer(0).getItemStack((short) 0).getQuantity() < 100) {
+                            containerState.getItemContainer().getContainer(0).addItemStackToSlot((short) 0, this.getItemContainer().getItemStack((short) 0).withQuantity(1));
+                            this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
+                        }
+                    }
+                    else{
+                            containerState.getItemContainer().getContainer(0).addItemStackToSlot((short) 0, this.getItemContainer().getItemStack((short) 0).withQuantity(1));
+                            this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
+                    }
                 }
+
             }
 
             if (this.data.exportOnce && exportedItems) {
@@ -132,21 +149,30 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             final WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(exportPos.x, exportPos.z));
             ItemStackSlotTransaction transaction = null;
             if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof ItemContainerState containerState) {
-                if(containerState.getItemContainer().getItemStack((short)0) != null && containerState instanceof ItemContainerBlockState){
-                    this.itemContainer.addItemStackToSlot((short)0, containerState.getItemContainer().getItemStack((short)0).withQuantity(1));
-                    containerState.getItemContainer().removeItemStackFromSlot((short)0, 1);
-
+                for(int n = 0 ;n <containerState.getItemContainer().getCapacity()-1;n++) {
+                    if (containerState.getItemContainer().getItemStack((short) n) != null && containerState instanceof ItemContainerBlockState) {
+                        if(this.getItemContainer().isEmpty()) {
+                            this.itemContainer.addItemStackToSlot((short) 0, containerState.getItemContainer().getItemStack((short) n).withQuantity(1));
+                            containerState.getItemContainer().removeItemStackFromSlot((short) n, 1);
+                        }
+                    }
                 }
             }
             if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof ProcessingBenchState containerState) {
                 if(!containerState.getItemContainer().isEmpty()) {
                     if (!containerState.getItemContainer().getContainer(2).isEmpty()) {
-                        HytaleLogger.getLogger().atInfo().log(containerState.getItemContainer().getContainer(2).getItemStack((short) 0).toString());
-                        if (containerState.getItemContainer().getContainer(2).getItemStack((short) 0) != null) {
-                            this.itemContainer.addItemStackToSlot((short) 0, containerState.getItemContainer().getContainer(2).getItemStack((short) 0).withQuantity(1));
-                            containerState.getItemContainer().getContainer(2).removeItemStackFromSlot((short) 0, 1);
-                        }
+                        for (int i = 0; i < containerState.getItemContainer().getContainer(2).getCapacity(); i++){
+                            if (containerState.getItemContainer().getContainer(2).getItemStack((short)i) != null) {
+                                HytaleLogger.getLogger().atInfo().log(containerState.getItemContainer().getContainer(2).getItemStack((short) 0).toString());
 
+                                if (!this.itemContainer.isEmpty()) {
+                                    ItemStackSlotTransaction t = this.itemContainer.addItemStackToSlot((short) 0, containerState.getItemContainer().getContainer(2).getItemStack((short) i).withQuantity(1));
+                                    if (t.succeeded()) {
+                                        containerState.getItemContainer().getContainer(2).removeItemStackFromSlot((short) i, 1);
+                                    }
+                                }
+                            }
+                        }
                     }
 
                 }
