@@ -13,15 +13,22 @@ import com.hypixel.hytale.math.shape.Box;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.math.util.HashUtil;
 import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.math.vector.Vector3f;
 import com.hypixel.hytale.math.vector.Vector3i;
 import com.hypixel.hytale.protocol.BlockPosition;
 import com.hypixel.hytale.protocol.ChangeVelocityType;
+import com.hypixel.hytale.protocol.ItemResourceType;
 import com.hypixel.hytale.protocol.Rangef;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.StateData;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+import com.hypixel.hytale.server.core.asset.type.item.config.ItemDrop;
 import com.hypixel.hytale.server.core.codec.ProtocolCodecs;
+import com.hypixel.hytale.server.core.entity.Entity;
+import com.hypixel.hytale.server.core.entity.ItemUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
 import com.hypixel.hytale.server.core.inventory.transaction.ItemStackSlotTransaction;
 import com.hypixel.hytale.server.core.inventory.transaction.Transaction;
@@ -70,9 +77,13 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
 
 
-
+    public boolean show(Entity e, World world, Vector3d v3d, Vector3f v3f, AddReason reason){
+        world.addEntity(e, v3d, v3f, reason);
+        return true;
+    }
     @Override
     public boolean initialize(BlockType blockType) {
+
         if (super.initialize(blockType) && blockType.getState() instanceof Data data) {
             this.data = data;
             setItemContainer(new SimpleItemContainer((short)1));
@@ -84,6 +95,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
     @Override
     public void tick(float dt, int index, ArchetypeChunk<ChunkStore> archeChunk, Store<ChunkStore> store, CommandBuffer<ChunkStore> commandBuffer) {
+
         final World world = store.getExternalData().getWorld();
         if (this.getItemContainer().getItemStack((short)0) != null) {
             //LOGGER.atInfo().log(Objects.requireNonNull(this.getItemContainer().getContainer(2).getItemStack((short)0).toString()));
@@ -121,20 +133,68 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             }
 
             if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof ProcessingBenchState containerState) {
-                if (!this.itemContainer.isEmpty()){
+                if (!this.itemContainer.isEmpty()) {
                     if (!containerState.getItemContainer().getContainer(2).isEmpty()) {
                         HytaleLogger.getLogger().atInfo().log(containerState.getItemContainer().getContainer(2).getItemStack((short) 0).toString());
                     }
-                    if(!containerState.getItemContainer().getContainer(0).isEmpty()) {
-                        if (containerState.getItemContainer().getContainer(0).getItemStack((short) 0).getQuantity() < 100) {
-                            containerState.getItemContainer().getContainer(0).addItemStackToSlot((short) 0, this.getItemContainer().getItemStack((short) 0).withQuantity(1));
-                            this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
+
+                    ItemStack source = this.getItemContainer().getItemStack((short) 0);
+                    if (source == null || source.getQuantity() <= 0) {
+                        return;
+                    }
+
+// try container 0 first, then container 1
+                    for (int c = 0; c <= 1; c++) {
+                        ItemContainer targetContainer =
+                                containerState.getItemContainer().getContainer(c);
+
+                        for (int n = 0; n < targetContainer.getCapacity(); n++) {
+                            ItemStack target = targetContainer.getItemStack((short) n);
+
+                            if (target == null || target.getQuantity() < 100) {
+                                ItemStackSlotTransaction t =
+                                        targetContainer.addItemStackToSlot(
+                                                (short) n, source.withQuantity(1)
+                                        );
+
+                                if (t.succeeded()) {
+                                    this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
+                                    return; // move exactly one item total
+                                }
+                            }
                         }
                     }
-                    else{
-                            containerState.getItemContainer().getContainer(0).addItemStackToSlot((short) 0, this.getItemContainer().getItemStack((short) 0).withQuantity(1));
-                            this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
+
+                    ItemStack source2 = this.getItemContainer().getItemStack((short) 0);
+                    if (source2 == null || source2.getQuantity() <= 0) {
+                        return;
                     }
+
+// iterate container 1 slots first, then container 0
+                    for (int c = 1; c >= 0; c--) {
+                        ItemContainer targetContainer =
+                                containerState.getItemContainer().getContainer(c);
+
+                        for (int n = 0; n < targetContainer.getCapacity(); n++) {
+                            ItemStack target = targetContainer.getItemStack((short) n);
+
+                            if (target == null || target.getQuantity() < 100) {
+                                ItemStackSlotTransaction t =
+                                        targetContainer.addItemStackToSlot(
+                                                (short) n, source2.withQuantity(1)
+                                        );
+
+                                if (t.succeeded()) {
+                                    this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
+                                    return; // move exactly one item
+                                }
+                            }
+                        }
+
+
+                }
+
+
                 }
 
             }
@@ -169,6 +229,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                     if (t.succeeded()) {
                                         containerState.getItemContainer().getContainer(2).removeItemStackFromSlot((short) i, 1);
                                     }
+
 
                             }
                         }
