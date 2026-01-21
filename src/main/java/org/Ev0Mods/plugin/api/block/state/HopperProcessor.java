@@ -180,7 +180,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                 if (t.succeeded()) {
                                     for (Ref<EntityStore> target2: getAllEntitiesInBox(this, this.getBlockPosition(), data.height, entities, data.players, data.entities, data.items))
                                     {
-                                        //if (!this.getItemContainer().isEmpty()) {
+                                        if (!this.getItemContainer().isEmpty()) {
                                                 //int length = ic.length;
                                                 //l.add( ItemUtilsExtended.throwItem(new Vector3d(pos.x, pos.y,pos.z), target2, (ComponentAccessor<EntityStore>) entities,this.getItemContainer().getItemStack((short) 0), Vector3d.UP, -.1f));
                                                 //ItemUtilsExtended.throwItem(entities, this.getItemContainer().getItemStack((short) 0), Vector3d.UP, 0.2f, new Vector3d(pos.x,pos.y,pos.z));
@@ -194,7 +194,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                                 }
                                             }
 
-                                        //}
+                                        }
 
                                     }
 
@@ -242,7 +242,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                     if (t.succeeded()) {
                                         for (Ref<EntityStore> target2: getAllEntitiesInBox(this, this.getBlockPosition(), data.height, entities, data.players, data.entities, data.items))
                                         {
-                                            //if (!this.getItemContainer().isEmpty()) {
+                                            if (!this.getItemContainer().isEmpty()) {
                                             //int length = ic.length;
                                             //l.add( ItemUtilsExtended.throwItem(new Vector3d(pos.x, pos.y,pos.z), target2, (ComponentAccessor<EntityStore>) entities,this.getItemContainer().getItemStack((short) 0), Vector3d.UP, -.1f));
                                             //ItemUtilsExtended.throwItem(entities, this.getItemContainer().getItemStack((short) 0), Vector3d.UP, 0.2f, new Vector3d(pos.x,pos.y,pos.z));
@@ -260,7 +260,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                                 }
                                             }
 
-                                            //}
+                                            }
 
                                         }
                                         this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
