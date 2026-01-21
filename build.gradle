@@ -129,3 +129,43 @@ tasks.register('generateVSCodeLaunch') {
         launchFile.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(launchConfig))
     }
 }
+
+// Decompile HytaleServer.jar using CFR. Usage:
+//   ./gradlew decompileServerJar
+// or override the server jar path:
+//   ./gradlew decompileServerJar -PserverJar="C:/path/to/HytaleServer.jar"
+tasks.register('decompileServerJar') {
+    group = 'decompile'
+    description = 'Download CFR decompiler and decompile the HytaleServer.jar into build/decompiled'
+
+    doFirst {
+        // locate server jar (allow override via -PserverJar)
+        def serverJarPath = project.hasProperty('serverJar') ? project.findProperty('serverJar') : "$hytaleHome/install/$patchline/package/game/latest/Server/HytaleServer.jar"
+        if (!file(serverJarPath).exists()) {
+            throw new GradleException("Hytale server jar not found: ${serverJarPath}. Override with -PserverJar=path if needed.")
+        }
+
+        // download CFR into buildDir if missing
+        def cfrDir = file("$buildDir/cfr")
+        cfrDir.mkdirs()
+        def cfrJar = file(cfrDir.path + '/cfr.jar')
+        if (!cfrJar.exists()) {
+            ant.get(src: 'https://www.benf.org/other/cfr/cfr-0.152.jar', dest: cfrJar)
+        }
+    }
+
+    doLast {
+        def serverJarPath = project.hasProperty('serverJar') ? project.findProperty('serverJar') : "$hytaleHome/install/$patchline/package/game/latest/Server/HytaleServer.jar"
+        def out = file("$buildDir/decompiled")
+        out.mkdirs()
+
+        println "Decompiling ${serverJarPath} -> ${out} using CFR..."
+        def cfrJar = file("$buildDir/cfr/cfr.jar")
+        ant.java(jar: cfrJar.absolutePath, fork: 'true') {
+            arg(value: serverJarPath)
+            arg(value: '--outputdir')
+            arg(value: out.absolutePath)
+        }
+        println "Decompiled classes are in: ${out.absolutePath}"
+    }
+}

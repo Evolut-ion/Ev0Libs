@@ -80,7 +80,7 @@ public class ConveyorProcessor extends ProcessingBenchState implements TickableB
     public void tick(float dt, int index, ArchetypeChunk<ChunkStore> archeChunk, Store<ChunkStore> store, CommandBuffer<ChunkStore> commandBuffer) {
         final World world = store.getExternalData().getWorld();
         if (this.getItemContainer().getContainer(2).getItemStack((short)0) != null) {
-            LOGGER.atInfo().log(Objects.requireNonNull(this.getItemContainer().getContainer(2).getItemStack((short)0).toString()));
+            //LOGGER.atInfo().log(Objects.requireNonNull(this.getItemContainer().getContainer(2).getItemStack((short)0).toString()));
         }
         final Store<EntityStore> entities = world.getEntityStore().getStore();
         final Instant currentTime = world.getEntityStore().getStore().getResource(WorldTimeResource.getResourceType()).getGameTime();
@@ -94,21 +94,21 @@ public class ConveyorProcessor extends ProcessingBenchState implements TickableB
         final Vector3i generatorPos = this.getBlockPosition();
         final BlockPosition pos = world.getBaseBlock(new BlockPosition(generatorPos.x, generatorPos.y, generatorPos.z));
         for (ConnectedBlockPatternRule.AdjacentSide side : this.data.exportFaces) {
-            LOGGER.atInfo().log(side.name());
+            //LOGGER.atInfo().log(side.name());
             boolean exportedItems = false;
             final Vector3i exportPos = new Vector3i(pos.x, pos.y, pos.z).add(WorldHelper.rotate(side, this.getRotationIndex()).relativePosition);
             final WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(exportPos.x, exportPos.z));
-            LOGGER.atInfo().log(chunk.toString());
+            //LOGGER.atInfo().log(chunk.toString());
             if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof ItemContainerState containerState) {
                 //for (ItemStack stack : this.data.output.outputList()) {
-                LOGGER.atInfo().log("Chunk Not Null" + exportPos.x + ", " +exportPos.y + ", " + exportPos.z);
-                LOGGER.atInfo().log(this.toString());
+                //LOGGER.atInfo().log("Chunk Not Null" + exportPos.x + ", " +exportPos.y + ", " + exportPos.z);
+                //LOGGER.atInfo().log(this.toString());
 
                 if(this.getItemContainer().getContainer(2).getItemStack((short) 0) != null ){
-                    LOGGER.atInfo().log(this.getItemContainer().getContainer(2).getItemStack((short) 0).toString());
+                    //LOGGER.atInfo().log(this.getItemContainer().getContainer(2).getItemStack((short) 0).toString());
                     final ItemStackSlotTransaction transaction = containerState.getItemContainer().addItemStackToSlot((short)0, Objects.requireNonNull(this.getItemContainer().getContainer(2).getItemStack((short) 0).withQuantity(1)));
                     this.getItemContainer().removeItemStack(Objects.requireNonNull(this.getItemContainer().getContainer(2).getItemStack((short) 0).withQuantity(1)));
-                    LOGGER.atInfo().log(transaction.toString());
+                    //LOGGER.atInfo().log(transaction.toString());
                     final ItemStack remainder = transaction.getRemainder();
                     if (transaction.succeeded() && (remainder == null || remainder.isEmpty())) {
                         exportedItems = true;
