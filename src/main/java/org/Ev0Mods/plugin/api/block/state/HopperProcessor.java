@@ -126,10 +126,13 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
         for(int b = 0; b<l.size()-1;b++) {
             //itemContainer.dropAllItemStacks();
+
             if(l.size() >0) {
                 Ref<EntityStore> esx = l.get(0);
                 l.remove(0);
-                this.es.removeEntity(esx, RemoveReason.REMOVE);
+                if(esx.isValid()) {
+                    this.es.removeEntity(esx, RemoveReason.REMOVE);
+                }
             }
 
         }
@@ -178,27 +181,30 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                             if(this.getItemContainer().getItemStack((short)0) != null && this.getItemContainer().getItemStack((short)0).getQuantity() <100) {
                                 ItemStackSlotTransaction t = containerState.getItemContainer().addItemStackToSlot((short) n, this.getItemContainer().getItemStack((short) 0).withQuantity(1));
                                 if (t.succeeded()) {
-                                    for (Ref<EntityStore> target2: getAllEntitiesInBox(this, this.getBlockPosition(), data.height, entities, data.players, data.entities, data.items))
-                                    {
+
                                         if (!this.getItemContainer().isEmpty()) {
                                                 //int length = ic.length;
                                                 //l.add( ItemUtilsExtended.throwItem(new Vector3d(pos.x, pos.y,pos.z), target2, (ComponentAccessor<EntityStore>) entities,this.getItemContainer().getItemStack((short) 0), Vector3d.UP, -.1f));
                                                 //ItemUtilsExtended.throwItem(entities, this.getItemContainer().getItemStack((short) 0), Vector3d.UP, 0.2f, new Vector3d(pos.x,pos.y,pos.z));
                                                 // HytaleLogger.getLogger().atInfo().log("Throwing" + pos.x + " " + pos.y + " " + pos.z + " ");
+                                            if(!l.isEmpty()){
                                             if( l.get(0) != null){
 
                                                 if(l.size() >0) {
                                                     Ref<EntityStore> esx = l.get(0);
                                                     l.remove(0);
-                                                    entities.removeEntity(esx, RemoveReason.REMOVE);
+                                                    if(esx.isValid()) {
+                                                        entities.removeEntity(esx, RemoveReason.REMOVE);
+                                                    }
                                                 }
-                                            }
+                                                this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
+                                            }}
 
-                                        }
 
+                                            break;
                                     }
 
-                                    this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
+
 
                                 }
                             }
@@ -263,10 +269,10 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
 
                                             }
-
+                                            this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
+                                            return;
                                         }
-                                        this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
-                                        return; // move exactly one item total
+                                         // move exactly one item total
                                     }
                                 }
                             }
@@ -327,23 +333,26 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof ItemContainerState containerState) {
                 for (int n = 0; n < containerState.getItemContainer().getCapacity() - 1; n++) {
                     if (containerState.getItemContainer().getItemStack((short) n) != null && containerState instanceof ItemContainerBlockState) {
-                            this.itemContainer.addItemStackToSlot((short) 0, containerState.getItemContainer().getItemStack((short) n).withQuantity(1));
-                            for (Ref<EntityStore> target2 : getAllEntitiesInBox(this, this.getBlockPosition(), data.height, entities, data.players, data.entities, data.items)) {
-                                    //int length = ic.length;
-                                    if(!this.itemContainer.isEmpty()) {
-                                        Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), sideVar, new Vector3d(pos.x, pos.y, pos.z), target2, (ComponentAccessor<EntityStore>) entities, this.getItemContainer().getItemStack((short) 0), Vector3d.ZERO, 0f);
-                                        HytaleLogger.getLogger().atInfo().log("Throwing");
-                                        //entities.addComponent(target2, Velocity.getComponentType()).set(0,1,0);
-                                        //entities.addComponent(target2,  PhysicsValues.getComponentType()).replaceValues(new PhysicsValues(0,0,true));
-                                        l.add(rs);
+                            ItemStackSlotTransaction t = this.itemContainer.addItemStackToSlot((short) 0, containerState.getItemContainer().getItemStack((short) n).withQuantity(1));
+                            if (t.succeeded()){
+                                for (Ref<EntityStore> target2 : getAllEntitiesInBox(this, this.getBlockPosition(), data.height, entities, data.players, data.entities, data.items)) {
+                                        //int length = ic.length;
+                                        if(!this.itemContainer.isEmpty()) {
+                                            Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), sideVar, new Vector3d(pos.x, pos.y, pos.z), target2, (ComponentAccessor<EntityStore>) entities, this.getItemContainer().getItemStack((short) 0), Vector3d.ZERO, 0f);
+                                            HytaleLogger.getLogger().atInfo().log("Throwing");
+                                            //entities.addComponent(target2, Velocity.getComponentType()).set(0,1,0);
+                                            //entities.addComponent(target2,  PhysicsValues.getComponentType()).replaceValues(new PhysicsValues(0,0,true));
+                                            l.add(rs);
 
-                                        //ItemUtilsExtended.throwItem(entities, this.getItemContainer().getItemStack((short) 0), Vector3d.UP, 0.2f, new Vector3d(pos.x,pos.y,pos.z));
-                                        HytaleLogger.getLogger().atInfo().log("Throwing" + pos.x + " " + pos.y + " " + pos.z + " ");
-                                    }
+                                            //ItemUtilsExtended.throwItem(entities, this.getItemContainer().getItemStack((short) 0), Vector3d.UP, 0.2f, new Vector3d(pos.x,pos.y,pos.z));
+                                            HytaleLogger.getLogger().atInfo().log("Throwing" + pos.x + " " + pos.y + " " + pos.z + " ");
+                                        }
+
+                                }
+
+                                    containerState.getItemContainer().removeItemStackFromSlot((short) n, 1);
 
                             }
-                            containerState.getItemContainer().removeItemStackFromSlot((short) n, 1);
-
                     }
                 }
             }

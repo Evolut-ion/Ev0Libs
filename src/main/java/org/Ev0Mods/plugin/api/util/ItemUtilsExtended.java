@@ -240,14 +240,16 @@ public class ItemUtilsExtended {
         //assert modelComponent != null;
 
         Vector3d throwPosition = transformComponent.getPosition().clone();
-        //Model model = modelComponent.getModel();
         throwPosition.add((double)0.0F, .5f, (double)0.0F).add(throwDirection);
+
         Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, new Vector3d(pos.x+.5,pos.y+.5,pos.z+.5), Vector3f.ZERO, 0, -1, 0);
         if (itemEntityHolder == null) {
             return null;
         } else {
+
             ItemComponent itemComponent = (ItemComponent)itemEntityHolder.getComponent(ItemComponent.getComponentType());
             if (itemComponent != null) {
+                itemEntityHolder.ensureAndGetComponent(EntityScaleComponent.getComponentType()).setScale(2);
                 itemComponent.setPickupDelay(100000000);
                 itemComponent.setRemovedByPlayerPickup(false);
                 itemComponent.computeDynamicLight();
