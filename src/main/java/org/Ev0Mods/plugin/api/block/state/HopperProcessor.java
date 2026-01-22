@@ -247,7 +247,8 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                             //l.add( ItemUtilsExtended.throwItem(new Vector3d(pos.x, pos.y,pos.z), target2, (ComponentAccessor<EntityStore>) entities,this.getItemContainer().getItemStack((short) 0), Vector3d.UP, -.1f));
                                             //ItemUtilsExtended.throwItem(entities, this.getItemContainer().getItemStack((short) 0), Vector3d.UP, 0.2f, new Vector3d(pos.x,pos.y,pos.z));
                                             // HytaleLogger.getLogger().atInfo().log("Throwing" + pos.x + " " + pos.y + " " + pos.z + " ");
-                                            if( l.get(0) != null){
+
+                                                if( l.get(0) != null){
 
                                                 if(drop){
                                                     if(l.get(0) != null){
@@ -258,7 +259,8 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                                         }
                                                     }
                                                 }
-                                            }
+                                                }
+
 
                                             }
 
@@ -325,25 +327,23 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof ItemContainerState containerState) {
                 for (int n = 0; n < containerState.getItemContainer().getCapacity() - 1; n++) {
                     if (containerState.getItemContainer().getItemStack((short) n) != null && containerState instanceof ItemContainerBlockState) {
-                        if (this.getItemContainer().isEmpty()) {
                             this.itemContainer.addItemStackToSlot((short) 0, containerState.getItemContainer().getItemStack((short) n).withQuantity(1));
                             for (Ref<EntityStore> target2 : getAllEntitiesInBox(this, this.getBlockPosition(), data.height, entities, data.players, data.entities, data.items)) {
-                                if (!this.getItemContainer().isEmpty()) {
                                     //int length = ic.length;
+                                    if(!this.itemContainer.isEmpty()) {
+                                        Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), sideVar, new Vector3d(pos.x, pos.y, pos.z), target2, (ComponentAccessor<EntityStore>) entities, this.getItemContainer().getItemStack((short) 0), Vector3d.ZERO, 0f);
+                                        HytaleLogger.getLogger().atInfo().log("Throwing");
+                                        //entities.addComponent(target2, Velocity.getComponentType()).set(0,1,0);
+                                        //entities.addComponent(target2,  PhysicsValues.getComponentType()).replaceValues(new PhysicsValues(0,0,true));
+                                        l.add(rs);
 
-                                    Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId() ,sideVar, new Vector3d(pos.x, pos.y, pos.z), target2, (ComponentAccessor<EntityStore>) entities, this.getItemContainer().getItemStack((short) 0), Vector3d.ZERO, 0f);
-                                    //entities.addComponent(target2, Velocity.getComponentType()).set(0,1,0);
-                                    //entities.addComponent(target2,  PhysicsValues.getComponentType()).replaceValues(new PhysicsValues(0,0,true));
-                                    l.add(rs);
-
-                                    //ItemUtilsExtended.throwItem(entities, this.getItemContainer().getItemStack((short) 0), Vector3d.UP, 0.2f, new Vector3d(pos.x,pos.y,pos.z));
-                                    // HytaleLogger.getLogger().atInfo().log("Throwing" + pos.x + " " + pos.y + " " + pos.z + " ");
-
-                                }
+                                        //ItemUtilsExtended.throwItem(entities, this.getItemContainer().getItemStack((short) 0), Vector3d.UP, 0.2f, new Vector3d(pos.x,pos.y,pos.z));
+                                        HytaleLogger.getLogger().atInfo().log("Throwing" + pos.x + " " + pos.y + " " + pos.z + " ");
+                                    }
 
                             }
                             containerState.getItemContainer().removeItemStackFromSlot((short) n, 1);
-                        }
+
                     }
                 }
             }
@@ -381,33 +381,33 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
         }
         }
 
-        for (Ref<EntityStore> target : getAllEntitiesInBox(this, this.getBlockPosition(), data.height, entities, data.players, data.entities, data.items)) {
-            final Player player = entities.getComponent(target, Player.getComponentType());
-            if (player != null) {
-                if (!EntityHelper.isCrouching(entities, target)) {
-                    final Velocity velocity = entities.getComponent(target, Velocity.getComponentType());
-                    if (velocity != null) {
-                        velocity.addInstruction(forceVec.clone().scale(12), null, ChangeVelocityType.Set);
-                    }
-                }
-                this.ca = entities;
-                final Velocity velocity = entities.getComponent(target, Velocity.getComponentType());
-                if (velocity != null) {
-                    velocity.addInstruction(forceVec.clone().scale(12), null, ChangeVelocityType.Set);
-                }
-            }
-            else {
-                final TransformComponent targetPos = entities.getComponent(target, TransformComponent.getComponentType());
-                if (targetPos != null) {
-                    final CollisionResult collision = new CollisionResult();
-                    final Box boundingBox = entities.getComponent(target, BoundingBox.getComponentType()).getBoundingBox();
-                    CollisionModule.findCollisions(boundingBox, targetPos.getPosition().clone(), forceVec.clone(), collision, entities);
-                    if (collision.getFirstBlockCollision() == null) {
-                        targetPos.getPosition().assign(targetPos.getPosition().add(forceVec.clone()));
-                    }
-                }
-            }
-        }
+//        for (Ref<EntityStore> target : getAllEntitiesInBox(this, this.getBlockPosition(), data.height, entities, data.players, data.entities, data.items)) {
+//            final Player player = entities.getComponent(target, Player.getComponentType());
+//            if (player != null) {
+//                if (!EntityHelper.isCrouching(entities, target)) {
+//                    final Velocity velocity = entities.getComponent(target, Velocity.getComponentType());
+//                    if (velocity != null) {
+//                        velocity.addInstruction(forceVec.clone().scale(12), null, ChangeVelocityType.Set);
+//                    }
+//                }
+//                this.ca = entities;
+//                final Velocity velocity = entities.getComponent(target, Velocity.getComponentType());
+//                if (velocity != null) {
+//                    velocity.addInstruction(forceVec.clone().scale(12), null, ChangeVelocityType.Set);
+//                }
+//            }
+//            else {
+////                final TransformComponent targetPos = entities.getComponent(target, TransformComponent.getComponentType());
+////                if (targetPos != null) {
+////                    final CollisionResult collision = new CollisionResult();
+////                    final Box boundingBox = entities.getComponent(target, BoundingBox.getComponentType()).getBoundingBox();
+////                    CollisionModule.findCollisions(boundingBox, targetPos.getPosition().clone(), forceVec.clone(), collision, entities);
+////                    if (collision.getFirstBlockCollision() == null) {
+////                        targetPos.getPosition().assign(targetPos.getPosition().add(forceVec.clone()));
+////                    }
+////                }
+//            }
+//        }
         this.es = entities;
     }
 
@@ -418,13 +418,13 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
     public static List<Ref<EntityStore>> getAllEntitiesInBox(HopperProcessor hp, Vector3i pos, float height, @Nonnull ComponentAccessor<EntityStore> components,  boolean players, boolean entities, boolean items) {
         final ObjectList<Ref<EntityStore>> results = SpatialResource.getThreadLocalReferenceList();
         final ObjectList<Ref<Store>> results2 = SpatialResource.getThreadLocalReferenceList();
-        final Vector3d min = new Vector3d(pos.x-1, pos.y , pos.z-1);
-        final Vector3d max = new Vector3d(pos.x+1, pos.y + height, pos.z+1);
+        final Vector3d min = new Vector3d(pos.x-.1, pos.y , pos.z-.1);
+        final Vector3d max = new Vector3d(pos.x+.1, pos.y, pos.z+.1);
         if (entities) {
             //components.getResource(EntityModule.get().getEntitySpatialResourceType()).getSpatialStructure().collectCylinder(new Vector3d(pos.x,pos.y,pos.z), 2,4,results );
         }
         if (players) {
-            components.getResource(EntityModule.get().getPlayerSpatialResourceType()).getSpatialStructure().collectCylinder(new Vector3d(pos.x,pos.y,pos.z), 8,6,results );
+            components.getResource(EntityModule.get().getPlayerSpatialResourceType()).getSpatialStructure().collectCylinder(new Vector3d(pos.x,pos.y,pos.z), 4, 8, results );
         }
         if (items) {
             //components.getResource(EntityModule.get().getItemSpatialResourceType()).getSpatialStructure().collectCylinder(new Vector3d(pos.x,pos.y,pos.z), 2,4,results );

@@ -1,14 +1,14 @@
 {
     "Group": "Ev0sMods",
     "Name": "Ev0Lib",
-    "Version": "1.2.0",
+    "Version": "1.2.1",
     "Description": "Ev0's Libs",
     "Authors": [
         {
-            "Name": "It's you!"
+            "Name": "OfficialEv0"
         }
     ],
-    "Website": "example.org",
+    "Website": "https://github.com/Evolut-ion/Ev0Libs",
     "ServerVersion": "*",
     "Dependencies": {
         

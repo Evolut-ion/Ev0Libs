@@ -181,7 +181,7 @@ public class ItemUtilsExtended {
 
         //assert modelComponent != null;
 
-        Vector3d throwPosition = transformComponent.getPosition().clone();
+        //Vector3d throwPosition = transformComponent.getPosition().clone();
         //Model model = modelComponent.getModel();
         //throwPosition.add((double)0.0F, .5f, (double)0.0F).add(throwDirection);
         Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, new Vector3d(pos.x+.5,pos.y,pos.z+.5), Vector3f.ZERO, 0, -1, 0);
@@ -209,24 +209,24 @@ public class ItemUtilsExtended {
 
             }
             if(side =="Up"){
-                ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, -1, 1);
+                (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, -1, 1);
             }
             if(side== "Down"){
-                ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 1, -1);
+                (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 1, -1);
             }
             if(side =="North"){
-                ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 0, 1);
+                (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 0, 1);
             }
             if(side== "South"){
-                ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 0, -1);
+                (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 0, -1);
             }
             if(side =="East"){
-                ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(-1, 0, 0);
+                (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(-1, 0, 0);
             }
             if(side == "West"){
-                ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(1, 0, 0);
+                (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(1, 0, 0);
             } else if(side == ""){
-                ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 1, 0);
+                (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 1, 0);
             }
 
             return store.addEntity(itemEntityHolder, AddReason.SPAWN);
@@ -241,8 +241,8 @@ public class ItemUtilsExtended {
 
         Vector3d throwPosition = transformComponent.getPosition().clone();
         //Model model = modelComponent.getModel();
-        //throwPosition.add((double)0.0F, .5f, (double)0.0F).add(throwDirection);
-        Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, new Vector3d(pos.x+.5,pos.y,pos.z+.5), Vector3f.ZERO, 0, -1, 0);
+        throwPosition.add((double)0.0F, .5f, (double)0.0F).add(throwDirection);
+        Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, new Vector3d(pos.x+.5,pos.y+.5,pos.z+.5), Vector3f.ZERO, 0, -1, 0);
         if (itemEntityHolder == null) {
             return null;
         } else {
@@ -254,6 +254,7 @@ public class ItemUtilsExtended {
                 PhysicsValues pv = new PhysicsValues(0,0,true);
                 ((PhysicsValues)itemEntityHolder.ensureAndGetComponent(PhysicsValues.getComponentType())).replaceValues(pv);
                 itemEntityHolder.removeComponent(PhysicsValues.getComponentType());
+                //itemEntityHolder.tryRemoveComponent(Compon)
 
                 HytaleLogger.getLogger().atInfo().log(side);
                 HytaleLogger.getLogger().atInfo().log(blockId);
