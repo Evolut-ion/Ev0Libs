@@ -126,18 +126,20 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
         for(int b = 0; b<l.size()-1;b++) {
             //itemContainer.dropAllItemStacks();
-
-            if(l.size() >0) {
-                Ref<EntityStore> esx = l.get(0);
-                l.remove(0);
-                if(esx.isValid()) {
-                    this.es.removeEntity(esx, RemoveReason.REMOVE);
+            if(!l.isEmpty()){
+                if(l.size() >b) {
+                    Ref<EntityStore> esx = l.get(0);
+                    l.remove(b);
+                    if(esx.isValid()) {
+                        this.es.removeEntity(esx, RemoveReason.REMOVE);
+                    }
                 }
             }
 
         }
 
         super.onDestroy();
+
 
 
     }
@@ -174,43 +176,95 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             final WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(exportPos.x, exportPos.z));
             //LOGGER.atInfo().log(chunk.toString());
 
+            if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof HopperProcessor containerState) {
+                    for(int n = 0; n< containerState.getItemContainer().getCapacity(); n++) {
+                        if(this.getItemContainer().getItemStack((short)0) != null && this.getItemContainer().getItemStack((short)0).getQuantity() <100) {
+                            ItemStackSlotTransaction t = containerState.getItemContainer().addItemStackToSlot((short) n, this.getItemContainer().getItemStack((short) 0).withQuantity(1));
+                            if (t.succeeded()) {
+                                if(drop){
+                                    if(!l.isEmpty()) {
+                                        if(l.getFirst() != null){
+
+                                            Ref<EntityStore> esx = l.getFirst();
+
+                                            if(esx.isValid()) {
+                                                l.removeFirst();
+                                                entities.removeEntity(esx, RemoveReason.REMOVE);
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!this.getItemContainer().isEmpty()) {
+                                    //int length = ic.length;
+                                    //l.add( ItemUtilsExtended.throwItem(new Vector3d(pos.x, pos.y,pos.z), target2, (ComponentAccessor<EntityStore>) entities,this.getItemContainer().getItemStack((short) 0), Vector3d.UP, -.1f));
+                                    //ItemUtilsExtended.throwItem(entities, this.getItemContainer().getItemStack((short) 0), Vector3d.UP, 0.2f, new Vector3d(pos.x,pos.y,pos.z));
+                                    // HytaleLogger.getLogger().atInfo().log("Throwing" + pos.x + " " + pos.y + " " + pos.z + " ");
+                                    this.getItemContainer().removeItemStackFromSlot((short) 0,1);
+                                    break;
+                                }
+                            }
+
+
+
+                                    if(!l.isEmpty()) {
+                                        Ref<EntityStore> esx = l.getFirst();
+                                        if(esx.isValid()) {
+                                            l.removeFirst();
+
+                                            entities.removeEntity(esx, RemoveReason.REMOVE);
+                                        }
+                                    }
+
+
+                        }
+                    }
+
+            }
+
 
             if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof ItemContainerState containerState) {
-                    if (!this.itemContainer.isEmpty())
                         for(int n = 0; n< containerState.getItemContainer().getCapacity(); n++) {
-                            if(this.getItemContainer().getItemStack((short)0) != null && this.getItemContainer().getItemStack((short)0).getQuantity() <100) {
+                            if(this.getItemContainer().getItemStack((short)0) != null) {
                                 ItemStackSlotTransaction t = containerState.getItemContainer().addItemStackToSlot((short) n, this.getItemContainer().getItemStack((short) 0).withQuantity(1));
                                 if (t.succeeded()) {
+                                    if(drop){
+                                        if(!l.isEmpty()) {
+                                            if(l.getFirst() != null){
 
-                                        if (!this.getItemContainer().isEmpty()) {
+                                                Ref<EntityStore> esx = l.getFirst();
+
+                                                if(esx.isValid()) {
+                                                    l.removeFirst();
+                                                    es.removeEntity(esx, RemoveReason.REMOVE);
+                                                }
+                                            }
+                                        }
+                                    }
+
                                                 //int length = ic.length;
                                                 //l.add( ItemUtilsExtended.throwItem(new Vector3d(pos.x, pos.y,pos.z), target2, (ComponentAccessor<EntityStore>) entities,this.getItemContainer().getItemStack((short) 0), Vector3d.UP, -.1f));
                                                 //ItemUtilsExtended.throwItem(entities, this.getItemContainer().getItemStack((short) 0), Vector3d.UP, 0.2f, new Vector3d(pos.x,pos.y,pos.z));
                                                 // HytaleLogger.getLogger().atInfo().log("Throwing" + pos.x + " " + pos.y + " " + pos.z + " ");
-                                            if(!l.isEmpty()){
-                                            if( l.get(0) != null){
+                                    this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
+                                }
 
-                                                if(l.size() >0) {
-                                                    Ref<EntityStore> esx = l.get(0);
-                                                    l.remove(0);
-                                                    if(esx.isValid()) {
-                                                        entities.removeEntity(esx, RemoveReason.REMOVE);
-                                                    }
-                                                }
-                                                this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
-                                            }}
+                            }
+                            if(drop){
+                                if(!l.isEmpty()) {
+                                    if(l.getFirst() != null){
 
+                                        Ref<EntityStore> esx = l.getFirst();
 
-                                            break;
+                                        if(esx.isValid()) {
+                                            l.removeFirst();
+                                            es.removeEntity(esx, RemoveReason.REMOVE);
+                                        }
                                     }
-
-
-
                                 }
                             }
                         }
-
             }
+
             if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof ProcessingBenchState containerState) {
                 if(drop == true){
                     if (!this.itemContainer.isEmpty()) {
@@ -253,31 +307,42 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                             //l.add( ItemUtilsExtended.throwItem(new Vector3d(pos.x, pos.y,pos.z), target2, (ComponentAccessor<EntityStore>) entities,this.getItemContainer().getItemStack((short) 0), Vector3d.UP, -.1f));
                                             //ItemUtilsExtended.throwItem(entities, this.getItemContainer().getItemStack((short) 0), Vector3d.UP, 0.2f, new Vector3d(pos.x,pos.y,pos.z));
                                             // HytaleLogger.getLogger().atInfo().log("Throwing" + pos.x + " " + pos.y + " " + pos.z + " ");
+                                            }
+                                            this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
+                                            if(drop){
+                                                if(!l.isEmpty()) {
+                                                    if(l.getFirst() != null){
 
-                                                if( l.get(0) != null){
+                                                        Ref<EntityStore> esx = l.getFirst();
 
-                                                if(drop){
-                                                    if(l.get(0) != null){
-                                                        if(l.size() >0) {
-                                                            Ref<EntityStore> esx = l.get(0);
-                                                            l.remove(0);
-                                                            if(esx.isValid()) {
-                                                                entities.removeEntity(esx, RemoveReason.REMOVE);
-                                                            }
+                                                        if(esx.isValid()) {
+                                                            l.removeFirst();
+                                                            es.removeEntity(esx, RemoveReason.REMOVE);
                                                         }
                                                     }
                                                 }
-                                                }
-
-
                                             }
-                                            this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
                                             return;
                                         }
                                          // move exactly one item total
                                     }
+
+                                        if(drop){
+                                            if(!l.isEmpty()) {
+                                                if(l.getFirst() != null){
+
+                                                    Ref<EntityStore> esx = l.getFirst();
+
+                                                    if(esx.isValid()) {
+                                                        l.removeFirst();
+                                                        es.removeEntity(esx, RemoveReason.REMOVE);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
-                            }
+
                         }
 
                         ItemStack source2 = this.getItemContainer().getItemStack((short) 0);
@@ -305,9 +370,37 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                                 //HytaleLogger.getLogger().atInfo().log("Throwing" + entities.toString());
 
                                             }
+
+                                            if(drop){
+                                                if(!l.isEmpty()){
+
+                                                        Ref<EntityStore> esx = l.getFirst();
+
+                                                        if(esx.isValid()) {
+                                                            l.removeFirst();
+                                                            es.removeEntity(esx, RemoveReason.REMOVE);
+                                                        }
+
+                                                }
+                                            }
                                         this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
+                                        }
+
                                         return; // move exactly one item
                                     }
+                                    if(drop){
+                                        if(!l.isEmpty()) {
+                                            if(l.getFirst() != null){
+
+                                                Ref<EntityStore> esx = l.getFirst();
+
+                                                if(esx.isValid()) {
+                                                    l.removeFirst();
+                                                    es.removeEntity(esx, RemoveReason.REMOVE);
+                                                }
+                                            }
+                                        }
+
                                 }
                             }
 
@@ -320,11 +413,24 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
             }
 
+
             if (this.data.exportOnce && exportedItems) {
                 break;
             }
 
         }
+            if(!l.isEmpty()) {
+                if(l.getFirst() != null){
+
+                    Ref<EntityStore> esx = l.getFirst();
+
+                    if(esx.isValid()) {
+                        l.removeFirst();
+                        es.removeEntity(esx, RemoveReason.REMOVE);
+                    }
+                }
+            }
+
 
         for (AdjacentSide side : this.data.importFaces) {
             final Vector3i exportPos = new Vector3i(pos.x, pos.y, pos.z).add(WorldHelper.rotate(side, this.getRotationIndex()).relativePosition);
@@ -358,6 +464,34 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                     }
                 }
             }
+
+            if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof HopperProcessor containerState) {
+                for (int n = 0; n < containerState.getItemContainer().getCapacity(); n++) {
+                    if (containerState.getItemContainer().getItemStack((short) 0) != null && containerState instanceof HopperProcessor) {
+                        ItemStackSlotTransaction t = this.itemContainer.addItemStackToSlot((short) 0, containerState.getItemContainer().getItemStack((short) 0).withQuantity(1));
+                        if (t.succeeded()){
+                            for (Ref<EntityStore> target2 : getAllEntitiesInBox(this, this.getBlockPosition(), data.height, entities, data.players, data.entities, data.items)) {
+                                //int length = ic.length;
+                                if(!this.itemContainer.isEmpty()) {
+                                    Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), sideVar, new Vector3d(pos.x, pos.y, pos.z), target2, (ComponentAccessor<EntityStore>) entities, this.getItemContainer().getItemStack((short) 0), Vector3d.ZERO, 0f);
+                                    HytaleLogger.getLogger().atInfo().log("Throwing");
+                                    //entities.addComponent(target2, Velocity.getComponentType()).set(0,1,0);
+                                    //entities.addComponent(target2,  PhysicsValues.getComponentType()).replaceValues(new PhysicsValues(0,0,true));
+                                    l.add(rs);
+
+                                    //ItemUtilsExtended.throwItem(entities, this.getItemContainer().getItemStack((short) 0), Vector3d.UP, 0.2f, new Vector3d(pos.x,pos.y,pos.z));
+                                    HytaleLogger.getLogger().atInfo().log("Throwing" + pos.x + " " + pos.y + " " + pos.z + " ");
+                                }
+
+                            }
+
+                            containerState.getItemContainer().removeItemStackFromSlot((short) 0, 1);
+
+                        }
+                    }
+                }
+            }
+
             if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof ProcessingBenchState containerState) {
                 //HytaleLogger.getLogger().atInfo().log(side.name());
                 if (!containerState.getItemContainer().isEmpty()) {

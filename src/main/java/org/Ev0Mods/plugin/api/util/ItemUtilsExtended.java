@@ -194,7 +194,7 @@ public class ItemUtilsExtended {
                 Instant despawnTime = Instant.ofEpochSecond((currentTime.toEpochMilli() + 1000));
                 DespawnComponent d = new DespawnComponent();
                 d.setDespawn(despawnTime);
-                itemEntityHolder.addComponent(DespawnComponent.getComponentType(), d);
+                itemEntityHolder.ensureAndGetComponent(DespawnComponent.getComponentType()).setDespawn(despawnTime);
                 itemComponent.setPickupDelay(100000000);
 
                 itemComponent.setRemovedByPlayerPickup(false);
@@ -209,10 +209,10 @@ public class ItemUtilsExtended {
 
             }
             if(side =="Up"){
-                (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, -1, 1);
+                (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, -1, 0);
             }
             if(side== "Down"){
-                (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 1, -1);
+                (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 1, 0);
             }
             if(side =="North"){
                 (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 0, 1);
@@ -240,16 +240,16 @@ public class ItemUtilsExtended {
         //assert modelComponent != null;
 
         Vector3d throwPosition = transformComponent.getPosition().clone();
-        throwPosition.add((double)0.0F, .5f, (double)0.0F).add(throwDirection);
+        throwPosition.add((double)0.5F, .25, (double).5F);
 
-        Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, new Vector3d(pos.x+.5,pos.y+.5,pos.z+.5), Vector3f.ZERO, 0, -1, 0);
+        Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, new Vector3d(pos.x+.5,pos.y+.2,pos.z+.5), Vector3f.ZERO, 0, -1, 0);
         if (itemEntityHolder == null) {
             return null;
         } else {
 
             ItemComponent itemComponent = (ItemComponent)itemEntityHolder.getComponent(ItemComponent.getComponentType());
             if (itemComponent != null) {
-                itemEntityHolder.ensureAndGetComponent(EntityScaleComponent.getComponentType()).setScale(2);
+                itemEntityHolder.ensureAndGetComponent(EntityScaleComponent.getComponentType()).setScale(.5f);
                 itemComponent.setPickupDelay(100000000);
                 itemComponent.setRemovedByPlayerPickup(false);
                 itemComponent.computeDynamicLight();
@@ -263,10 +263,10 @@ public class ItemUtilsExtended {
 
             }
             if(side =="Up"){
-                ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, -1, 1);
+                ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, -1, 0);
             }
             if(side== "Down"){
-                ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 1, -1);
+                ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 1, 0);
             }
             if(side =="North"){
                 ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 0, 1);
@@ -295,8 +295,8 @@ public class ItemUtilsExtended {
 
         Vector3d throwPosition = transformComponent.getPosition().clone();
         //Model model = modelComponent.getModel();
-        throwPosition.add((double)0.0F, 1.5f, (double).5F);
-        transformComponent.setPosition(new Vector3d(throwPosition.x, throwPosition.y+.2, throwPosition.z));
+        throwPosition.add((double)0.0F, 0.0f, (double).5F);
+        transformComponent.setPosition(new Vector3d(pos.x, pos.y-.5, pos.z));
         Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, pos, Vector3f.ZERO, 0, -.1f * throwSpeed, 0);
         if (itemEntityHolder == null) {
             return null;
