@@ -261,7 +261,9 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                                         if(l.size() >0) {
                                                             Ref<EntityStore> esx = l.get(0);
                                                             l.remove(0);
-                                                            entities.removeEntity(esx, RemoveReason.REMOVE);
+                                                            if(esx.isValid()) {
+                                                                entities.removeEntity(esx, RemoveReason.REMOVE);
+                                                            }
                                                         }
                                                     }
                                                 }
