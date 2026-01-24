@@ -131,12 +131,12 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
     @Override
     public void onDestroy() {
 
-        for(int b = 0; b<l.size()-1;b++) {
-            //itemContainer.dropAllItemStacks();
+        for(int b = 0; b<=l.size()-1;b++) {
+            itemContainer.dropAllItemStacks();
             if(!l.isEmpty()){
                 if(l.size() >b) {
                     Ref<EntityStore> esx = l.get(0);
-                    l.remove(b);
+                    l.remove(0);
                     if(esx.isValid()) {
                         this.es.removeEntity(esx, RemoveReason.REMOVE);
                     }
@@ -242,17 +242,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                 ItemStackSlotTransaction t = containerState.getItemContainer().addItemStackToSlot((short) n, this.getItemContainer().getItemStack((short) 0).withQuantity(1));
                                 if (t.succeeded()) {
                                     if(drop){
-                                        if(!l.isEmpty()) {
-                                            if(l.getFirst() != null){
 
-                                                Ref<EntityStore> esx = l.getFirst();
-
-                                                if(esx.isValid()) {
-                                                    l.removeFirst();
-                                                    es.removeEntity(esx, RemoveReason.REMOVE);
-                                                }
-                                            }
-                                        }
                                     }
 
                                                 //int length = ic.length;
@@ -272,7 +262,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
                                         if(esx.isValid()) {
                                             l.removeFirst();
-                                            es.removeEntity(esx, RemoveReason.REMOVE);
+                                            entities.removeEntity(esx, RemoveReason.REMOVE);
                                         }
                                     }
                                 }
@@ -332,7 +322,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
                                                         if(esx.isValid()) {
                                                             l.removeFirst();
-                                                            es.removeEntity(esx, RemoveReason.REMOVE);
+                                                            entities.removeEntity(esx, RemoveReason.REMOVE);
                                                         }
                                                     }
                                                 }
@@ -350,7 +340,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
                                                     if(esx.isValid()) {
                                                         l.removeFirst();
-                                                        es.removeEntity(esx, RemoveReason.REMOVE);
+                                                        entities.removeEntity(esx, RemoveReason.REMOVE);
                                                     }
                                                 }
                                             }
@@ -393,7 +383,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
                                                         if(esx.isValid()) {
                                                             l.removeFirst();
-                                                            es.removeEntity(esx, RemoveReason.REMOVE);
+                                                            entities.removeEntity(esx, RemoveReason.REMOVE);
                                                         }
 
                                                 }
@@ -411,7 +401,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
                                                 if(esx.isValid()) {
                                                     l.removeFirst();
-                                                    es.removeEntity(esx, RemoveReason.REMOVE);
+                                                    entities.removeEntity(esx, RemoveReason.REMOVE);
                                                 }
                                             }
                                         }
