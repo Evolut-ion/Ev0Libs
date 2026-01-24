@@ -258,8 +258,8 @@ public class ItemUtilsExtended {
                 itemEntityHolder.removeComponent(PhysicsValues.getComponentType());
                 //itemEntityHolder.tryRemoveComponent(Compon)
 
-                HytaleLogger.getLogger().atInfo().log(side);
-                HytaleLogger.getLogger().atInfo().log(blockId);
+                //HytaleLogger.getLogger().atInfo().log(side);
+                //HytaleLogger.getLogger().atInfo().log(blockId);
 
             }
             if(side =="Up"){
