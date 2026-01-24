@@ -19,6 +19,8 @@ import com.hypixel.hytale.protocol.BlockPosition;
 import com.hypixel.hytale.protocol.ChangeVelocityType;
 import com.hypixel.hytale.protocol.ItemResourceType;
 import com.hypixel.hytale.protocol.Rangef;
+import com.hypixel.hytale.server.core.HytaleServer;
+import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.StateData;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
@@ -59,8 +61,12 @@ import com.hypixel.hytale.server.core.universe.world.meta.state.ItemContainerBlo
 import com.hypixel.hytale.server.core.universe.world.meta.state.ItemContainerState;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.util.FillerBlockUtil;
 import com.nimbusds.jose.util.Container;
+//import dev.dukedarius.HytaleIndustries.BlockStates.ItemPipeBlockState;
+//import dev.dukedarius.HytaleIndustries.HytaleIndustriesPlugin;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import org.Ev0Mods.plugin.Ev0Lib;
 import org.Ev0Mods.plugin.api.codec.Codecs;
 import org.Ev0Mods.plugin.api.codec.IdOutput;
 import org.Ev0Mods.plugin.api.codec.ItemHandler;
@@ -69,6 +75,7 @@ import org.Ev0Mods.plugin.api.util.ItemUtilsExtended;
 import org.Ev0Mods.plugin.api.util.WorldHelper;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -143,11 +150,16 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
 
     }
-
+    private static boolean isProcessingBench(@Nullable BlockType bt){
+        return bt != null
+        && bt.getState()!= null;
+    }
     @Override
     public void tick(float dt, int index, ArchetypeChunk<ChunkStore> archeChunk, Store<ChunkStore> store, CommandBuffer<ChunkStore> commandBuffer) {
+
         this.timerV = this.timerV +1.0;
         final World world = store.getExternalData().getWorld();
+
         if (this.getItemContainer().getItemStack((short)0) != null) {
             //LOGGER.atInfo().log(Objects.requireNonNull(this.getItemContainer().getContainer(2).getItemStack((short)0).toString()));
         }
@@ -175,6 +187,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             final Vector3i exportPos = new Vector3i(pos.x, pos.y, pos.z).add(WorldHelper.rotate(side, this.getRotationIndex()).relativePosition);
             final WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(exportPos.x, exportPos.z));
             //LOGGER.atInfo().log(chunk.toString());
+
 
             if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof HopperProcessor containerState) {
                     for(int n = 0; n< containerState.getItemContainer().getCapacity(); n++) {
@@ -222,7 +235,8 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             }
 
 
-            if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof ItemContainerState containerState) {
+
+            if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof ItemContainerBlockState containerState) {
                         for(int n = 0; n< containerState.getItemContainer().getCapacity(); n++) {
                             if(this.getItemContainer().getItemStack((short)0) != null) {
                                 ItemStackSlotTransaction t = containerState.getItemContainer().addItemStackToSlot((short) n, this.getItemContainer().getItemStack((short) 0).withQuantity(1));
@@ -246,6 +260,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                                 //ItemUtilsExtended.throwItem(entities, this.getItemContainer().getItemStack((short) 0), Vector3d.UP, 0.2f, new Vector3d(pos.x,pos.y,pos.z));
                                                 // HytaleLogger.getLogger().atInfo().log("Throwing" + pos.x + " " + pos.y + " " + pos.z + " ");
                                     this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
+                                    break;
                                 }
 
                             }
@@ -447,13 +462,13 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                         //int length = ic.length;
                                         if(!this.itemContainer.isEmpty()) {
                                             Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), sideVar, new Vector3d(pos.x, pos.y, pos.z), target2, (ComponentAccessor<EntityStore>) entities, this.getItemContainer().getItemStack((short) 0), Vector3d.ZERO, 0f);
-                                            HytaleLogger.getLogger().atInfo().log("Throwing");
+                                            //HytaleLogger.getLogger().atInfo().log("Throwing");
                                             //entities.addComponent(target2, Velocity.getComponentType()).set(0,1,0);
                                             //entities.addComponent(target2,  PhysicsValues.getComponentType()).replaceValues(new PhysicsValues(0,0,true));
                                             l.add(rs);
 
                                             //ItemUtilsExtended.throwItem(entities, this.getItemContainer().getItemStack((short) 0), Vector3d.UP, 0.2f, new Vector3d(pos.x,pos.y,pos.z));
-                                            HytaleLogger.getLogger().atInfo().log("Throwing" + pos.x + " " + pos.y + " " + pos.z + " ");
+                                            //HytaleLogger.getLogger().atInfo().log("Throwing" + pos.x + " " + pos.y + " " + pos.z + " ");
                                         }
 
                                 }
@@ -474,13 +489,13 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                 //int length = ic.length;
                                 if(!this.itemContainer.isEmpty()) {
                                     Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), sideVar, new Vector3d(pos.x, pos.y, pos.z), target2, (ComponentAccessor<EntityStore>) entities, this.getItemContainer().getItemStack((short) 0), Vector3d.ZERO, 0f);
-                                    HytaleLogger.getLogger().atInfo().log("Throwing");
+                                    //HytaleLogger.getLogger().atInfo().log("Throwing");
                                     //entities.addComponent(target2, Velocity.getComponentType()).set(0,1,0);
                                     //entities.addComponent(target2,  PhysicsValues.getComponentType()).replaceValues(new PhysicsValues(0,0,true));
                                     l.add(rs);
 
                                     //ItemUtilsExtended.throwItem(entities, this.getItemContainer().getItemStack((short) 0), Vector3d.UP, 0.2f, new Vector3d(pos.x,pos.y,pos.z));
-                                    HytaleLogger.getLogger().atInfo().log("Throwing" + pos.x + " " + pos.y + " " + pos.z + " ");
+                                    //HytaleLogger.getLogger().atInfo().log("Throwing" + pos.x + " " + pos.y + " " + pos.z + " ");
                                 }
 
                             }
@@ -582,6 +597,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
         ComponentRegistryProxy<EntityStore> entityStoreRegistry = EntityModule.get().getEntityStoreRegistry();
         return EntityModule.get().getBlockEntityComponentType();
     }
+
     public static class Data extends StateData {
 
         @Nonnull

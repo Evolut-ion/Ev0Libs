@@ -33,7 +33,6 @@ public class Ev0Lib extends JavaPlugin {
         //Borrowed from Spellbook
         final var itemOutputCodec = this.getCodecRegistry(ItemHandler.CODEC);
         final BlockStateRegistry blockStateRegistry = this.getBlockStateRegistry();
-        blockStateRegistry.registerBlockState(ConveyorProcessor.class, idPascal("ConveyorCrafter"), ConveyorProcessor.CODEC, ConveyorProcessor.Data.class, ConveyorProcessor.Data.CODEC);
         blockStateRegistry.registerBlockState(HopperProcessor.class, idPascal("HopperCrafter"), HopperProcessor.CODEC, HopperProcessor.Data.class, HopperProcessor.Data.CODEC);
     }
     public static String idPascal(String id) {
