@@ -1,12 +1,15 @@
 package org.Ev0Mods.plugin;
 
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.world.meta.BlockStateRegistry;
-import org.Ev0Mods.plugin.api.block.state.ConveyorProcessor;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import org.Ev0Mods.plugin.api.block.state.HopperProcessor;
 import org.Ev0Mods.plugin.api.codec.ItemHandler;
+import org.Ev0Mods.plugin.api.component.FluidComponent;
+import org.Ev0Mods.plugin.api.system.LiquidPlacingSystem;
 
 import javax.annotation.Nonnull;
 
@@ -19,6 +22,7 @@ public class Ev0Lib extends JavaPlugin {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     public static final String GROUP = "Ev0sMods";
     public static final String NAME = "Ev0Lib";
+    private ComponentType<EntityStore, FluidComponent> FluidComponent;
 
 
     public Ev0Lib(@Nonnull JavaPluginInit init) {
@@ -29,11 +33,12 @@ public class Ev0Lib extends JavaPlugin {
     @Override
     protected void setup() {
         LOGGER.atInfo().log("Setting up plugin " + this.getName());
-        this.getCommandRegistry().registerCommand(new ExampleCommand(this.getName(), this.getManifest().getVersion().toString()));
-        //Borrowed from Spellbook
         final var itemOutputCodec = this.getCodecRegistry(ItemHandler.CODEC);
+        this.getChunkStoreRegistry().registerSystem(new LiquidPlacingSystem());
         final BlockStateRegistry blockStateRegistry = this.getBlockStateRegistry();
         blockStateRegistry.registerBlockState(HopperProcessor.class, idPascal("HopperCrafter"), HopperProcessor.CODEC, HopperProcessor.Data.class, HopperProcessor.Data.CODEC);
+        this.FluidComponent = this.getEntityStoreRegistry()
+                .registerComponent(FluidComponent.class, FluidComponent::new);
     }
     public static String idPascal(String id) {
         return GROUP + NAME + id;
@@ -42,4 +47,13 @@ public class Ev0Lib extends JavaPlugin {
     public static String idSnake(String id) {
         return GROUP + "_" + NAME + "_" + id;
     }
+
+    public ComponentType<EntityStore, FluidComponent> getFluidComponent() {
+        return FluidComponent;
+    }
+
+    public void setFluidComponent(ComponentType<EntityStore, FluidComponent> liquidComponent) {
+        FluidComponent = liquidComponent;
+    }
+
 }
