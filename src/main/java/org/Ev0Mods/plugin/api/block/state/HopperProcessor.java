@@ -154,7 +154,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
     @Override
     public void onDestroy() {
 
-        for(int b = 0; b<=l.size()-1;b++) {
+        for(int b = 0; b<l.size()-1;b++) {
             itemContainer.dropAllItemStacks();
             if(!l.isEmpty()){
                 if(l.size() >b) {
@@ -328,7 +328,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
 
             if (chunk != null && chunk.getState(exportPos.x, exportPos.y, exportPos.z) instanceof ProcessingBenchState containerState) {
-                if(drop == true){
+                if(drop){
                     if (!this.itemContainer.isEmpty()) {
                         if (!containerState.getItemContainer().getContainer(2).isEmpty()) {
                             //HytaleLogger.getLogger().atInfo().log(containerState.getItemContainer().getContainer(2).getItemStack((short) 0).toString());
@@ -351,7 +351,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                     ItemStackSlotTransaction t =
 
                                             targetContainer.addItemStackToSlot(
-                                                    (short) n, source.withQuantity(1)
+                                                    (short) n, Objects.requireNonNull(source.withQuantity(1))
                                             );
                                     be = new BlockEntity(this.getItemContainer().getItemStack((short) 0).getItem().getBlockId());
                                     Vector3d v3d = new Vector3d(pos.x, pos.y, pos.z);
@@ -423,7 +423,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                 if (target == null || target.getQuantity() < 100) {
                                     ItemStackSlotTransaction t =
                                             targetContainer.addItemStackToSlot(
-                                                    (short) n, source2.withQuantity(1)
+                                                    (short) n, Objects.requireNonNull(source2.withQuantity(1))
                                             );
 
                                     if (t.succeeded()) {
@@ -450,32 +450,32 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
                                         return; // move exactly one item
                                     }
-                                    if(drop){
-                                        if(!l.isEmpty()) {
-                                            if(l.getFirst() != null){
 
-                                                Ref<EntityStore> esx = l.getFirst();
-
-                                                if(esx.isValid()) {
-                                                    l.removeFirst();
-                                                    entities.removeEntity(esx, RemoveReason.REMOVE);
-                                                }
-                                            }
-                                        }
-
-                                }
                             }
 
 
                     }
                 }
 
+                    if(drop){
+                        if(!l.isEmpty()) {
+                            if(l.getFirst() != null){
 
+                                Ref<EntityStore> esx = l.getFirst();
+
+                                if(esx.isValid()) {
+                                    l.removeFirst();
+                                    entities.removeEntity(esx, RemoveReason.REMOVE);
+                                }
+                            }
+                        }
+
+                    }
                 }
 
             } else{
 
-                for (Ref<EntityStore> target2: getAllItemsInBox(this, this.getBlockPosition(), data.height, entities, data.players, data.entities, data.items))
+                for (Ref<EntityStore> target2: getAllItemsInBox(this, side.relativePosition, data.height, entities, data.players, data.entities, data.items))
                 {
                     if (!this.getItemContainer().isEmpty()) {
                         //int length = ic.length;
@@ -485,6 +485,8 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                     }
                     ItemComponent ic = target2.getStore().getComponent(target2, ItemComponent.getComponentType());
 
+
+                    assert ic != null;
                     this.getItemContainer().addItemStack(ic.getItemStack());
                     entities.removeEntity(target2, RemoveReason.REMOVE);
                     if(drop){
@@ -588,65 +590,65 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             }
 
             if (chunk != null && chunk.getFluidId(exportPos.x, exportPos.y, exportPos.z) >0 &&  chunk.getFluidId(exportPos.x, exportPos.y, exportPos.z) < 8) {
+                for(int f = 0; f < this.data.exportFaces.length;f++)
+                    if (this.itemContainer.isEmpty()) {
+                        //HytaleLogger.getLogger().atInfo().log(String.valueOf(chunk.getFluidId(exportPos.x, exportPos.y, exportPos.z)));
+                        fluid_id = chunk.getFluidId(exportPos.x, exportPos.y, exportPos.z);
+                        ItemStack is = null;
+                        //HytaleLogger.getLogger().atInfo().log(String.valueOf(BlockType.getAssetMap().getIndex(String.valueOf(fluid_id))));
+                        switch (chunk.getFluidId(exportPos.x, exportPos.y, exportPos.z)) {
 
-                if (this.itemContainer.isEmpty()) {
-                    //HytaleLogger.getLogger().atInfo().log(String.valueOf(chunk.getFluidId(exportPos.x, exportPos.y, exportPos.z)));
-                    fluid_id = chunk.getFluidId(exportPos.x, exportPos.y, exportPos.z);
-                    ItemStack is = null;
-                    //HytaleLogger.getLogger().atInfo().log(String.valueOf(BlockType.getAssetMap().getIndex(String.valueOf(fluid_id))));
-                    switch (chunk.getFluidId(exportPos.x, exportPos.y, exportPos.z)) {
+                            case 0: //empty
 
-                        case 0: //empty
-
-                            break;
-                        case 1: //
-                            fluid_id = 1;
-                            //is = new ItemStack("Fluid_Water", 1, null);
-                            break;
-                        case 2: //RedSlime
-                            fluid_id = 2;
-                            chunk.setBlock(exportPos.x,exportPos.y,exportPos.z, BlockType.EMPTY);
-                            is = new ItemStack("*Container_Bucket_State_Filled_Red_Slime", 1, null);
-                            break;
-                        case 3: // Tar
-                            fluid_id = 3;
-                            chunk.setBlock(exportPos.x,exportPos.y,exportPos.z, BlockType.EMPTY);
-                            is = new ItemStack("*Container_Bucket_State_Filled_Tar", 1, null);
-                            break;
-                        case 4: //Poison
-                            fluid_id = 4;
-                            chunk.setBlock(exportPos.x,exportPos.y,exportPos.z, BlockType.EMPTY);
-                            is = new ItemStack("*Container_Bucket_State_Filled_Poison", 1, null);
-                            break;
-                        case 5: //Green Slime
-                            fluid_id = 5;
-                            chunk.setBlock(exportPos.x,exportPos.y,exportPos.z, BlockType.EMPTY);
-                            is = new ItemStack("*Container_Bucket_State_Filled_Green_Slime", 1, null);
-                            break;
-                        case 6: //Lava
-                            fluid_id = 6;
-                            chunk.setBlock(exportPos.x,exportPos.y,exportPos.z, BlockType.EMPTY);
-                            is = new ItemStack("*Container_Bucket_State_Filled_Lava", 1, null);
-                            break;
-                        case 7: // Water
-                            fluid_id = 7;
-                            chunk.setBlock(exportPos.x,exportPos.y,exportPos.z, BlockType.EMPTY);
-
-
-
-                            is = new ItemStack("*Container_Bucket_State_Filled_Water", 1, null);
-                            break;
-                        case 8:
-                            fluid_id = 8;
-                            chunk.setBlock(exportPos.x,exportPos.y,exportPos.z, "Debug_Test_Block");
-                            is = new ItemStack("*Container_Bucket_State_Filled_Water", 1, null);
-                            break;
+                                break;
+                            case 1: //
+                                fluid_id = 1;
+                                //is = new ItemStack("Fluid_Water", 1, null);
+                                break;
+                            case 2: //RedSlime
+                                fluid_id = 2;
+                                chunk.setBlock(exportPos.x,exportPos.y,exportPos.z, BlockType.EMPTY);
+                                is = new ItemStack("*Container_Bucket_State_Filled_Red_Slime", 1, null);
+                                break;
+                            case 3: // Tar
+                                fluid_id = 3;
+                                chunk.setBlock(exportPos.x,exportPos.y,exportPos.z, BlockType.EMPTY);
+                                is = new ItemStack("*Container_Bucket_State_Filled_Tar", 1, null);
+                                break;
+                            case 4: //Poison
+                                fluid_id = 4;
+                                chunk.setBlock(exportPos.x,exportPos.y,exportPos.z, BlockType.EMPTY);
+                                is = new ItemStack("*Container_Bucket_State_Filled_Poison", 1, null);
+                                break;
+                            case 5: //Green Slime
+                                fluid_id = 5;
+                                chunk.setBlock(exportPos.x,exportPos.y,exportPos.z, BlockType.EMPTY);
+                                is = new ItemStack("*Container_Bucket_State_Filled_Green_Slime", 1, null);
+                                break;
+                            case 6: //Lava
+                                fluid_id = 6;
+                                chunk.setBlock(exportPos.x,exportPos.y,exportPos.z, BlockType.EMPTY);
+                                is = new ItemStack("*Container_Bucket_State_Filled_Lava", 1, null);
+                                break;
+                            case 7: // Water
+                                fluid_id = 7;
+                                chunk.setBlock(exportPos.x,exportPos.y,exportPos.z, BlockType.EMPTY);
 
 
 
+                                is = new ItemStack("*Container_Bucket_State_Filled_Water", 1, null);
+                                break;
+                            case 8:
+                                fluid_id = 8;
+                                chunk.setBlock(exportPos.x,exportPos.y,exportPos.z, "Debug_Test_Block");
+                                is = new ItemStack("*Container_Bucket_State_Filled_Water", 1, null);
+                                break;
 
-                    }
-                    f = Fluid.getAssetMap().getAsset(fluid_id);
+
+
+
+                        }
+                    this.f = Fluid.getAssetMap().getAsset(fluid_id);
                     if(is != null) {
                         boolean t =   this.itemContainer.canAddItemStack(is);
                         if(t) {
@@ -740,7 +742,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             components.getResource(EntityModule.get().getPlayerSpatialResourceType()).getSpatialStructure().collectCylinder(new Vector3d(pos.x,pos.y,pos.z), 4, 8, results );
         }
         if (items) {
-                components.getResource(EntityModule.get().getItemSpatialResourceType()).getSpatialStructure().collectCylinder(new Vector3d(pos.x,pos.y,pos.z), 2,4,results );
+                //components.getResource(EntityModule.get().getItemSpatialResourceType()).getSpatialStructure().collectCylinder(new Vector3d(pos.x,pos.y,pos.z), 2,4,results );
         }
         hp.ca = components;
         return results;
@@ -757,7 +759,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             //components.getResource(EntityModule.get().getPlayerSpatialResourceType()).getSpatialStructure().collectCylinder(new Vector3d(pos.x,pos.y,pos.z), 4, 8, results );
         }
         if (items) {
-            components.getResource(EntityModule.get().getItemSpatialResourceType()).getSpatialStructure().collectCylinder(new Vector3d(pos.x,pos.y,pos.z), 2,4,results );
+            components.getResource(EntityModule.get().getItemSpatialResourceType()).getSpatialStructure().collectBox(new Vector3d(pos.x,pos.y,pos.z), new Vector3d(pos.x,pos.y,pos.z),results );
         }
         hp.ca = components;
         return results;
