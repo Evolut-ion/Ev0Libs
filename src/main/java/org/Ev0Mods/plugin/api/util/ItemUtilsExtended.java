@@ -37,6 +37,11 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public class ItemUtilsExtended {
+    private static double centerCoord(double c) {
+        double frac = c - Math.floor(c);
+        if (Math.abs(frac - 0.5) < 0.01) return c; // already centered
+        return c + 0.5; // integer block coordinate -> center
+    }
     @Nonnull
     public static ComponentType<EntityStore, ItemComponent> getComponentItemType() {
         return EntityModule.get().getItemComponentType();
@@ -128,17 +133,37 @@ public class ItemUtilsExtended {
         Vector3d throwPosition = transformComponent.getPosition().clone();
         //Model model = modelComponent.getModel();
         //throwPosition.add((double)0.0F, .5f, (double)0.0F).add(throwDirection);
+        HytaleLogger.getLogger().atInfo().log("generateItemDrop: pos=" + throwPosition + " item=" + itemStack);
         Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, throwPosition, Vector3f.ZERO, 0, -.1f, 0);
         if (itemEntityHolder == null) {
+            HytaleLogger.getLogger().atInfo().log("generateItemDrop returned null for item=" + itemStack + " at " + throwPosition);
             return null;
         } else {
             ItemComponent itemComponent = (ItemComponent)itemEntityHolder.getComponent(ItemComponent.getComponentType());
             if (itemComponent != null) {
                 itemComponent.setPickupDelay(20000000000f);
                 itemComponent.setRemovedByPlayerPickup(false);
+                try {
+                    final Instant currentTime = store.getResource(WorldTimeResource.getResourceType()).getGameTime();
+                    Instant despawnTime = currentTime.plusSeconds(5);
+                    itemEntityHolder.ensureAndGetComponent(DespawnComponent.getComponentType()).setDespawn(despawnTime);
+                    HytaleLogger.getLogger().atInfo().log("throwItem(generateItemDrop): despawnTime=" + despawnTime);
+                } catch (Exception ignored) {}
             }
 
-            return store.addEntity(itemEntityHolder, AddReason.SPAWN);
+            Ref<EntityStore> added = store.addEntity(itemEntityHolder, AddReason.SPAWN);
+            try {
+                ((PhysicsValues)itemEntityHolder.ensureAndGetComponent(PhysicsValues.getComponentType())).replaceValues(new PhysicsValues(0,0,true));
+            } catch (Exception ignored) {}
+            try {
+                itemEntityHolder.tryRemoveComponent(BoundingBox.getComponentType());
+            } catch (Exception ignored) {}
+            try {
+                itemEntityHolder.ensureAndGetComponent(Intangible.getComponentType());
+            } catch (Exception ignored) {}
+
+            HytaleLogger.getLogger().atInfo().log("addEntity returned=" + added + " for item=" + itemStack);
+            return added;
         }
     }
 
@@ -153,8 +178,10 @@ public class ItemUtilsExtended {
         Vector3d throwPosition = transformComponent.getPosition().clone();
         //Model model = modelComponent.getModel();
         //throwPosition.add((double)0.0F, .5f, (double)0.0F).add(throwDirection);
+        HytaleLogger.getLogger().atInfo().log("generateItemDrop (pos overload): pos=" + new Vector3d(pos.x+.5,pos.y +1.5,pos.z+.5) + " item=" + itemStack);
         Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, new Vector3d(pos.x+.5,pos.y +1.5,pos.z+.5), Vector3f.ZERO, 0, -1, 0);
         if (itemEntityHolder == null) {
+            HytaleLogger.getLogger().atInfo().log("generateItemDrop returned null (pos overload) for item=" + itemStack);
             return null;
         } else {
             ItemComponent itemComponent = (ItemComponent)itemEntityHolder.getComponent(ItemComponent.getComponentType());
@@ -167,10 +194,25 @@ public class ItemUtilsExtended {
 
                 ((PhysicsValues)itemEntityHolder.ensureAndGetComponent(PhysicsValues.getComponentType())).replaceValues(pv);
                 ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(-1, 0, 0);
+                try {
+                    final Instant currentTime = store.getResource(WorldTimeResource.getResourceType()).getGameTime();
+                    Instant despawnTime = currentTime.plusSeconds(5);
+                    itemEntityHolder.ensureAndGetComponent(DespawnComponent.getComponentType()).setDespawn(despawnTime);
+                    HytaleLogger.getLogger().atInfo().log("throwItem(pos overload): despawnTime=" + despawnTime);
+                } catch (Exception ignored) {}
             }
 
 
-            return store.addEntity(itemEntityHolder, AddReason.SPAWN);
+            Ref<EntityStore> added = store.addEntity(itemEntityHolder, AddReason.SPAWN);
+            try {
+                itemEntityHolder.tryRemoveComponent(BoundingBox.getComponentType());
+            } catch (Exception ignored) {}
+            try {
+                itemEntityHolder.ensureAndGetComponent(Intangible.getComponentType());
+            } catch (Exception ignored) {}
+
+            HytaleLogger.getLogger().atInfo().log("addEntity returned=" + added + " (pos overload) for item=" + itemStack);
+            return added;
         }
     }
     @Nullable
@@ -184,52 +226,54 @@ public class ItemUtilsExtended {
         //Vector3d throwPosition = transformComponent.getPosition().clone();
         //Model model = modelComponent.getModel();
         //throwPosition.add((double)0.0F, .5f, (double)0.0F).add(throwDirection);
-        Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, new Vector3d(pos.x+.5,pos.y,pos.z+.5), Vector3f.ZERO, 0, -1, 0);
+        Vector3d spawnPos = new Vector3d(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
+        Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, spawnPos, Vector3f.ZERO, 0, 0, 0);
         if (itemEntityHolder == null) {
             return null;
         } else {
             ItemComponent itemComponent = (ItemComponent)itemEntityHolder.getComponent(ItemComponent.getComponentType());
             if (itemComponent != null) {
                 final Instant currentTime = store.getResource(WorldTimeResource.getResourceType()).getGameTime();
-                Instant despawnTime = Instant.ofEpochSecond((currentTime.toEpochMilli() + 1000));
-                DespawnComponent d = new DespawnComponent();
-                d.setDespawn(despawnTime);
+                // Despawn visuals after 5 seconds
+                Instant despawnTime = currentTime.plusSeconds(5);
                 itemEntityHolder.ensureAndGetComponent(DespawnComponent.getComponentType()).setDespawn(despawnTime);
+                HytaleLogger.getLogger().atInfo().log("throwItem(side overload): despawnTime=" + despawnTime);
                 itemComponent.setPickupDelay(100000000);
-
                 itemComponent.setRemovedByPlayerPickup(false);
                 itemComponent.computeDynamicLight();
                 PhysicsValues pv = new PhysicsValues(0,0,true);
-
                 ((PhysicsValues)itemEntityHolder.ensureAndGetComponent(PhysicsValues.getComponentType())).replaceValues(pv);
-                itemEntityHolder.removeComponent(PhysicsValues.getComponentType());
-
-
+                // remove physics component as in Ev0Libs so visuals don't collide
+                try { itemEntityHolder.removeComponent(PhysicsValues.getComponentType()); } catch (Exception ignored) {}
                 HytaleLogger.getLogger().atInfo().log(side);
 
             }
-            if(side =="Up"){
+            // Normalize side comparisons and set a sensible velocity for visuals (match Ev0Libs)
+            try {
+                itemEntityHolder.tryRemoveComponent(BoundingBox.getComponentType());
+            } catch (Exception ignored) {}
+            try {
+                itemEntityHolder.ensureAndGetComponent(Intangible.getComponentType());
+            } catch (Exception ignored) {}
+            if (side != null && side.equalsIgnoreCase("Up")) {
                 (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, -1, 0);
-            }
-            if(side== "Down"){
+            } else if (side != null && side.equalsIgnoreCase("Down")) {
                 (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 1, 0);
-            }
-            if(side =="North"){
+            } else if (side != null && side.equalsIgnoreCase("North")) {
                 (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 0, 1);
-            }
-            if(side== "South"){
+            } else if (side != null && side.equalsIgnoreCase("South")) {
                 (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 0, -1);
-            }
-            if(side =="East"){
+            } else if (side != null && side.equalsIgnoreCase("East")) {
                 (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(-1, 0, 0);
-            }
-            if(side == "West"){
+            } else if (side != null && side.equalsIgnoreCase("West")) {
                 (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(1, 0, 0);
-            } else if(side == ""){
+            } else {
                 (itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 1, 0);
             }
 
-            return store.addEntity(itemEntityHolder, AddReason.SPAWN);
+            Ref<EntityStore> added = store.addEntity(itemEntityHolder, AddReason.SPAWN);
+            HytaleLogger.getLogger().atInfo().log("throwItem(side overload): addEntity returned=" + added + " for side=" + side + " spawnPos=" + spawnPos + " item=" + itemStack);
+            return added;
         }
     }
     public static Ref<EntityStore> throwItem(String blockId, String side, Vector3d pos, @Nonnull Ref<EntityStore> ref, @Nonnull ComponentAccessor<EntityStore> store, @Nonnull ItemStack itemStack, @Nonnull Vector3d throwDirection, float throwSpeed) {
@@ -242,7 +286,9 @@ public class ItemUtilsExtended {
         Vector3d throwPosition = transformComponent.getPosition().clone();
         throwPosition.add((double)0.5F, .25, (double).5F);
 
-        Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, new Vector3d(pos.x+.5,pos.y+.2,pos.z+.5), Vector3f.ZERO, 0, -1, 0);
+        // Use block-centered spawn position like Ev0Libs
+        Vector3d spawnPos = new Vector3d(pos.x + 0.5, pos.y + 0.2, pos.z + 0.5);
+        Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, spawnPos, Vector3f.ZERO, 0, -1, 0);
         if (itemEntityHolder == null) {
             return null;
         } else {
@@ -255,35 +301,32 @@ public class ItemUtilsExtended {
                 itemComponent.computeDynamicLight();
                 PhysicsValues pv = new PhysicsValues(0,0,true);
                 ((PhysicsValues)itemEntityHolder.ensureAndGetComponent(PhysicsValues.getComponentType())).replaceValues(pv);
-                itemEntityHolder.removeComponent(PhysicsValues.getComponentType());
-                //itemEntityHolder.tryRemoveComponent(Compon)
-
-                //HytaleLogger.getLogger().atInfo().log(side);
-                //HytaleLogger.getLogger().atInfo().log(blockId);
-
+                // remove physics component as in Ev0Libs so visuals don't collide
+                try { itemEntityHolder.removeComponent(PhysicsValues.getComponentType()); } catch (Exception ignored) {}
+                
             }
-            if(side =="Up"){
+
+            // Normalize side comparisons and set sensible velocity for visuals (match Ev0Libs)
+
+            if (side != null && side.equalsIgnoreCase("Up")) {
                 ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, -1, 0);
-            }
-            if(side== "Down"){
+            } else if (side != null && side.equalsIgnoreCase("Down")) {
                 ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 1, 0);
-            }
-            if(side =="North"){
+            } else if (side != null && side.equalsIgnoreCase("North")) {
                 ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 0, 1);
-            }
-            if(side== "South"){
+            } else if (side != null && side.equalsIgnoreCase("South")) {
                 ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 0, -1);
-            }
-            if(side =="East"){
+            } else if (side != null && side.equalsIgnoreCase("East")) {
                 ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(-1, 0, 0);
-            }
-            if(side == "West"){
+            } else if (side != null && side.equalsIgnoreCase("West")) {
                 ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(1, 0, 0);
-            } else if(side == ""){
+            } else {
                 ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 1, 0);
             }
 
-            return store.addEntity(itemEntityHolder, AddReason.SPAWN);
+            Ref<EntityStore> added = store.addEntity(itemEntityHolder, AddReason.SPAWN);
+            HytaleLogger.getLogger().atInfo().log("throwItem(blockId overload): addEntity returned=" + added + " spawnPos=" + spawnPos + " item=" + itemStack);
+            return added;
         }
     }
     public static Ref<EntityStore> throwItem( @Nonnull Ref<EntityStore> ref, @Nonnull ComponentAccessor<EntityStore> store, @Nonnull ItemStack itemStack, @Nonnull Vector3d throwDirection, float throwSpeed, Vector3d pos) {
@@ -307,6 +350,12 @@ public class ItemUtilsExtended {
                 itemComponent.setPickupDelay(2f);
                 ((Velocity)itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(0, 0, 0);
 
+                try {
+                    final Instant currentTime = store.getResource(WorldTimeResource.getResourceType()).getGameTime();
+                    Instant despawnTime = currentTime.plusSeconds(5);
+                    itemEntityHolder.ensureAndGetComponent(DespawnComponent.getComponentType()).setDespawn(despawnTime);
+                    HytaleLogger.getLogger().atInfo().log("throwItem(ref,pos overload): despawnTime=" + despawnTime);
+                } catch (Exception ignored) {}
 
                 TransformComponent tn = new TransformComponent(pos, Vector3f.ZERO);
 

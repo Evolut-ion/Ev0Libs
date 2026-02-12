@@ -2,6 +2,7 @@ package org.Ev0Mods.plugin;
 
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.world.meta.BlockStateRegistry;
@@ -9,6 +10,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import org.Ev0Mods.plugin.api.block.state.HopperProcessor;
 import org.Ev0Mods.plugin.api.codec.ItemHandler;
 import org.Ev0Mods.plugin.api.component.FluidComponent;
+import org.Ev0Mods.plugin.api.interactions.WrenchInteraction;
 import org.Ev0Mods.plugin.api.system.LiquidPlacingSystem;
 
 import javax.annotation.Nonnull;
@@ -39,6 +41,7 @@ public class Ev0Lib extends JavaPlugin {
         blockStateRegistry.registerBlockState(HopperProcessor.class, idPascal("HopperCrafter"), HopperProcessor.CODEC, HopperProcessor.Data.class, HopperProcessor.Data.CODEC);
         this.FluidComponent = this.getEntityStoreRegistry()
                 .registerComponent(FluidComponent.class, FluidComponent::new);
+        this.getCodecRegistry(Interaction.CODEC).register("WrenchInteraction", WrenchInteraction.class, WrenchInteraction.CODEC);
     }
     public static String idPascal(String id) {
         return GROUP + NAME + id;
@@ -55,5 +58,6 @@ public class Ev0Lib extends JavaPlugin {
     public void setFluidComponent(ComponentType<EntityStore, FluidComponent> liquidComponent) {
         FluidComponent = liquidComponent;
     }
+
 
 }
