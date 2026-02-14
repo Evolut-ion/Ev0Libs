@@ -113,6 +113,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
+import java.util.logging.Level;
 
 import static com.hypixel.hytale.builtin.fluid.FluidSystems.*;
 import static org.bouncycastle.asn1.x500.style.BCStyle.T;
@@ -124,9 +125,26 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
     public int fluid_id = 0;
     public Rangef duration = new Rangef(0, 10);
     public float tier;
-    public static final BuilderCodec<HopperProcessor> CODEC = BuilderCodec.builder(HopperProcessor.class, HopperProcessor::new, BlockState.BASE_CODEC).append(new KeyedCodec<>("StartTime", Codec.INSTANT, true), (i, v) -> i.startTime = v, i -> i.startTime).add()
+    public static final BuilderCodec<HopperProcessor> CODEC = BuilderCodec.builder(HopperProcessor.class, HopperProcessor::new, BlockState.BASE_CODEC)
+            .append(new KeyedCodec<>("StartTime", Codec.INSTANT, true), (i, v) -> i.startTime = v, i -> i.startTime).add()
             .append(new KeyedCodec<>("Tier", Codec.FLOAT, true), (i, v) -> i.tier = v, i -> i.tier).add()
-            .append(new KeyedCodec<>("Substitutions", Codec.STRING_ARRAY, true), (i, v) -> i.substitutions = v, i -> i.substitutions).add().append(new KeyedCodec<>("Timer", Codec.DOUBLE, true), (i, v) -> i.timer = v, i -> i.timer).add().build();
+            .append(new KeyedCodec<>("Substitutions", Codec.STRING_ARRAY, true), (i, v) -> i.substitutions = v, i -> i.substitutions).add()
+            .append(new KeyedCodec<>("Timer", Codec.DOUBLE, true), (i, v) -> i.timer = v, i -> i.timer).add()
+            // Persist filter mode and lists so UI state survives reloads
+            .append(new KeyedCodec<>("FilterMode", Codec.STRING, true), (i, v) -> i.filterMode = v == null ? "Off" : v, i -> i.filterMode).add()
+            .append(new KeyedCodec<>("Whitelist", Codec.STRING_ARRAY, true), (i, v) -> {
+                if (v == null) i.whitelist.clear(); else {
+                    i.whitelist.clear();
+                    i.whitelist.addAll(Arrays.asList(v));
+                }
+            }, i -> i.whitelist.toArray(new String[0])).add()
+            .append(new KeyedCodec<>("Blacklist", Codec.STRING_ARRAY, true), (i, v) -> {
+                if (v == null) i.blacklist.clear(); else {
+                    i.blacklist.clear();
+                    i.blacklist.addAll(Arrays.asList(v));
+                }
+            }, i -> i.blacklist.toArray(new String[0])).add()
+            .build();
     protected Instant startTime;
     private double timerV = 0;
     private double timer = 0;
@@ -151,6 +169,92 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
     private Fluid f;
     private int tickCounter = 0;
 
+    // Runtime filter state for this hopper (not persisted yet)
+    private final List<String> whitelist = new ArrayList<>();
+    private final List<String> blacklist = new ArrayList<>();
+    private String filterMode = "Off";
+    // Temporary per-player typed buffer (so TextField changes can be captured even if Add button doesn't send value)
+    private final Map<com.hypixel.hytale.server.core.universe.PlayerRef, String> typedBuffer = new HashMap<>();
+
+    public synchronized List<String> getWhitelist() { return new ArrayList<>(whitelist); }
+    public synchronized List<String> getBlacklist() { return new ArrayList<>(blacklist); }
+    public synchronized String getFilterMode() { return filterMode; }
+    public synchronized void addToWhitelist(String id) { if (id != null) whitelist.add(id); }
+    public synchronized void addToBlacklist(String id) { if (id != null) blacklist.add(id); }
+    public synchronized void setFilterMode(String mode) { if (mode != null) filterMode = mode; }
+    public synchronized String removeLastFromWhitelist() {
+        if (whitelist.isEmpty()) return null;
+        return whitelist.remove(whitelist.size() - 1);
+    }
+    public synchronized String removeLastFromBlacklist() {
+        if (blacklist.isEmpty()) return null;
+        return blacklist.remove(blacklist.size() - 1);
+    }
+    public synchronized void clearWhitelist() { whitelist.clear(); }
+    public synchronized void clearBlacklist() { blacklist.clear(); }
+
+    public synchronized void setTypedBuffer(com.hypixel.hytale.server.core.universe.PlayerRef p, String v) {
+        if (p == null) return;
+        if (v == null) typedBuffer.remove(p);
+        else typedBuffer.put(p, v);
+    }
+
+    public synchronized String getTypedBuffer(com.hypixel.hytale.server.core.universe.PlayerRef p) {
+        if (p == null) return null;
+        return typedBuffer.get(p);
+    }
+
+    // Returns true when the given block key is allowed to be imported according to filter state
+    private synchronized boolean isItemAllowedByFilter(String blockKey) {
+        // If mode is not set or Off, allow everything
+        if (filterMode == null || filterMode.equalsIgnoreCase("Off")) return true;
+
+        // Whitelist mode: if whitelist is empty/null, block everything. Only allow exact matches.
+        if (filterMode.equalsIgnoreCase("Whitelist")) {
+            if (whitelist == null || whitelist.isEmpty()) return false;
+            if (blockKey == null) return false;
+            for (String s : whitelist) {
+                if (s != null && s.equalsIgnoreCase(blockKey)) return true;
+            }
+            return false;
+        }
+
+        // Blacklist mode: if blacklist is empty/null, allow everything. Block only exact matches.
+        if (filterMode.equalsIgnoreCase("Blacklist")) {
+            if (blacklist == null || blacklist.isEmpty()) return true;
+            if (blockKey == null) return true;
+            for (String s : blacklist) {
+                if (s != null && s.equalsIgnoreCase(blockKey)) return false;
+            }
+            return true;
+        }
+
+        // Default allow
+        return true;
+    }
+
+    // Try to resolve a reliable id/key string from an ItemStack using known accessors, fallback to toString()
+    public synchronized String resolveItemStackKey(ItemStack stack) {
+        if (stack == null) return null;
+        try {
+            Object probe = null;
+            try { probe = stack.getBlockKey(); } catch (Throwable ignored) {}
+            if (probe == null) {
+                String[] candidates = new String[]{"getItemId","getItemKey","getId","getKey","getName","getBlockKey"};
+                for (String m : candidates) {
+                    try {
+                        java.lang.reflect.Method mm = stack.getClass().getMethod(m);
+                        Object v = mm.invoke(stack);
+                        if (v != null) { probe = v; break; }
+                    } catch (Throwable ignored) {}
+                }
+            }
+            if (probe == null) probe = stack.toString();
+            return String.valueOf(probe);
+        } catch (Throwable t) {
+            try { return String.valueOf(stack.toString()); } catch (Throwable ignored) { return null; }
+        }
+    }
     {
         ic = new Ref[0];
     }
@@ -165,8 +269,21 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
     @Override
     public void onOpen(@NonNullDecl Ref<EntityStore> ref, @NonNullDecl World world, @NonNullDecl Store<EntityStore> store) {
-        super.onOpen(ref, world, store);
+        // Use the PageManager / InteractiveCustomUIPage approach to open the custom page for this hopper
         rf = store.getComponent(ref, PlayerRef.getComponentType());
+        HytaleLogger.getLogger().atInfo().log("HopperProcessor.onOpen called, playerRef=" + rf + " ref=" + ref);
+        try {
+            if (rf == null) {
+                HytaleLogger.getLogger().at(Level.WARNING).log("PlayerRef is null in onOpen; cannot open UI");
+                return;
+            }
+            Vector3i pos = this.getBlockPosition();
+            HytaleLogger.getLogger().atInfo().log("HopperProcessor.onOpen: opening page for ref=" + ref + " playerRef=" + rf + " pos=" + pos);
+            org.Ev0Mods.plugin.api.ui.HopperUIPage.open(rf, store, pos, null);
+            HytaleLogger.getLogger().atInfo().log("Opened HopperUIPage via HyUI PageBuilder for ref=" + ref);
+        } catch (Throwable t) {
+            HytaleLogger.getLogger().at(Level.WARNING).log("Failed to open HopperUIPage: " + t.getMessage());
+        }
     }
 
     @Override
@@ -185,7 +302,13 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
     @Override
     public boolean canOpen(@NonNullDecl Ref<EntityStore> ref, @NonNullDecl ComponentAccessor<EntityStore> componentAccessor) {
-        return super.canOpen(ref, componentAccessor);
+        // Allow the native container UI to open — don't block it here.
+        try {
+            return super.canOpen(ref, componentAccessor);
+        } catch (Throwable t) {
+            HytaleLogger.getLogger().at(Level.WARNING).log("HopperProcessor.canOpen encountered error: " + t.getMessage());
+            return true;
+        }
     }
 
     @Override
@@ -457,6 +580,12 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                     for (int slot = 0; slot < output.getCapacity(); slot++) {
                         ItemStack stack = output.getItemStack((short) slot);
                         if (stack == null) continue;
+                        // Apply filter: skip items not allowed
+                        String probeKeyPb = resolveItemStackKey(stack);
+                        if (!isItemAllowedByFilter(probeKeyPb)) {
+                            HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping processing-bench import item=" + probeKeyPb + " mode=" + getFilterMode());
+                            continue;
+                        }
                         int transferAmount = (int) Math.min(data.tier * 2, Math.min(stack.getQuantity(), MAX_STACK - hopperQty));
                         if (transferAmount <= 0) continue;
                         ItemStack safeStack = stack.withQuantity(transferAmount);
@@ -501,6 +630,12 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             for (int slot = 0; slot < container.getCapacity(); slot++) {
                 ItemStack stack = container.getItemStack((short) slot);
                 if (stack == null) continue;
+                        // Apply filter: skip items not allowed
+                        String probeKey = resolveItemStackKey(stack);
+                        if (!isItemAllowedByFilter(probeKey)) {
+                            HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping import item=" + probeKey + " mode=" + getFilterMode());
+                            continue;
+                        }
                 int transferAmount = (int) Math.min(data.tier * 2, Math.min(stack.getQuantity(), MAX_STACK - hopperQuantity));
                 if (transferAmount <= 0) continue;
                 ItemStack safeStack = stack.withQuantity(transferAmount);
@@ -594,6 +729,12 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
             ItemStack safeStack = sourcex.withQuantity(transferAmount);
 
+            // Apply filter: do not export items that are blocked by filter
+            if (!isItemAllowedByFilter(safeStack.getBlockKey())) {
+                HytaleLogger.getLogger().atInfo().log("Hopper filter: blocking export to processing bench item=" + safeStack.getBlockKey() + " mode=" + getFilterMode());
+                return false;
+            }
+
             // Only input containers (0 and 1)
             for (int c = 0; c <= 1; c++) {
 
@@ -626,6 +767,12 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
         for (int slot = 0; slot < target.getCapacity(); slot++) {
 
+            // Apply filter: do not export items that are blocked by filter
+            if (!isItemAllowedByFilter(source.getBlockKey())) {
+                HytaleLogger.getLogger().atInfo().log("Hopper filter: blocking export to container item=" + source.getBlockKey() + " mode=" + getFilterMode());
+                return false;
+            }
+
             ItemStackSlotTransaction t =
                     target.addItemStackToSlot((short) slot,
                             source.withQuantity(amount));
@@ -645,6 +792,12 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                      Vector3i pos,
                                      ItemStack source,
                                      int amount) {
+
+        // Apply filter: do not export items that are blocked by filter
+        if (!isItemAllowedByFilter(source.getBlockKey())) {
+            HytaleLogger.getLogger().atInfo().log("Hopper filter: blocking export to world item=" + source.getBlockKey() + " mode=" + getFilterMode());
+            return false;
+        }
 
         // If block is empty, place block item
         if (chunk.getBlockType(pos.x, pos.y, pos.z) == null) {
@@ -743,6 +896,12 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
                 ItemStack stack = output.getItemStack((short) slot);
                 if (stack == null) continue;
+                // Apply filter: skip items not allowed
+                if (!isItemAllowedByFilter(stack.getBlockKey())) {
+                    String probeKeyPb2 = resolveItemStackKey(stack);
+                    HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping processing-bench import item=" + probeKeyPb2 + " mode=" + getFilterMode());
+                    continue;
+                }
 
                 int transferAmount =
                         (int) Math.min(data.tier * 2, stack.getQuantity());
@@ -797,6 +956,13 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             for (int n = 0; n < otherHopper.getItemContainer().getCapacity(); n++) {
                 ItemStack otherStack = otherHopper.getItemContainer().getItemStack((short) n);
                 if (otherStack == null) continue;
+
+                // Apply filter: skip items not allowed
+                String otherKey = resolveItemStackKey(otherStack);
+                if (!isItemAllowedByFilter(otherKey)) {
+                    HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping import from other hopper item=" + otherKey + " mode=" + getFilterMode());
+                    continue;
+                }
 
                 // Try to take a single item from the other hopper into this hopper
                 ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, otherStack.withQuantity(1));
@@ -893,6 +1059,13 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             ItemStack stack =
                 sourceContainer.getItemStack((short) slot);
             if (stack == null) continue;
+
+            // Apply filter: skip items not allowed
+            String probeKey2 = resolveItemStackKey(stack);
+            if (!isItemAllowedByFilter(probeKey2)) {
+                HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping import from container item=" + probeKey2 + " mode=" + getFilterMode());
+                continue;
+            }
 
             int transferAmount =
                 (int) Math.min(data.tier * 2, stack.getQuantity());

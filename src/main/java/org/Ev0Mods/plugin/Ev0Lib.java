@@ -11,6 +11,7 @@ import org.Ev0Mods.plugin.api.block.state.HopperProcessor;
 import org.Ev0Mods.plugin.api.codec.ItemHandler;
 import org.Ev0Mods.plugin.api.component.FluidComponent;
 import org.Ev0Mods.plugin.api.interactions.WrenchInteraction;
+import org.Ev0Mods.plugin.api.interactions.HopperInteraction;
 import org.Ev0Mods.plugin.api.system.LiquidPlacingSystem;
 
 import javax.annotation.Nonnull;
@@ -41,7 +42,8 @@ public class Ev0Lib extends JavaPlugin {
         blockStateRegistry.registerBlockState(HopperProcessor.class, idPascal("HopperCrafter"), HopperProcessor.CODEC, HopperProcessor.Data.class, HopperProcessor.Data.CODEC);
         this.FluidComponent = this.getEntityStoreRegistry()
                 .registerComponent(FluidComponent.class, FluidComponent::new);
-        this.getCodecRegistry(Interaction.CODEC).register("WrenchInteraction", WrenchInteraction.class, WrenchInteraction.CODEC);
+        this.getCodecRegistry(Interaction.CODEC).<WrenchInteraction>register("WrenchInteraction", WrenchInteraction.class, WrenchInteraction.CODEC);
+        this.getCodecRegistry(Interaction.CODEC).register("HopperInteraction", HopperInteraction.class,  HopperInteraction.CODEC);
     }
     public static String idPascal(String id) {
         return GROUP + NAME + id;
