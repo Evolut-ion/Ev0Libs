@@ -54,7 +54,7 @@ public class WrenchInteraction extends SimpleBlockInteraction {
             HopperProcessor c = (HopperProcessor)var11;
             HopperProcessor cx = (HopperProcessor)chunk.getState(contextTargetBlock.x, contextTargetBlock.y, contextTargetBlock.z);
             for (int v = 0; v < c.data.substitutions.length; ++v) {
-                ((HytaleLogger.Api) HytaleLogger.getLogger().atInfo()).log(c.data.substitutions[0]);
+                //((HytaleLogger.Api) HytaleLogger.getLogger().atInfo()).log(c.data.substitutions[0]);
                 ItemStack is = new ItemStack(c.data.substitutions[this.r.nextInt(c.data.substitutions.length)]);
                 Item i = is.getItem();
                 String blockKey = is.getBlockKey();

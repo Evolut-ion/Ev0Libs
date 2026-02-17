@@ -116,7 +116,7 @@ public class ItemUtilsExtended {
                 Vector3d direction = Transform.getDirection(rotation.getPitch(), rotation.getYaw());
                 return throwItem(ref, componentAccessor, itemStack, direction, throwSpeed);
             } else {
-                HytaleLogger.getLogger().at(Level.WARNING).log("Attempted to throw invalid item %s at %s by %s", itemStack, throwSpeed, ref.getIndex());
+                //HytaleLogger.getLogger().at(Level.WARNING).log("Attempted to throw invalid item %s at %s by %s", itemStack, throwSpeed, ref.getIndex());
                 return null;
             }
         }
@@ -133,10 +133,10 @@ public class ItemUtilsExtended {
         Vector3d throwPosition = transformComponent.getPosition().clone();
         //Model model = modelComponent.getModel();
         //throwPosition.add((double)0.0F, .5f, (double)0.0F).add(throwDirection);
-        HytaleLogger.getLogger().atInfo().log("generateItemDrop: pos=" + throwPosition + " item=" + itemStack);
+        //HytaleLogger.getLogger().atInfo().log("generateItemDrop: pos=" + throwPosition + " item=" + itemStack);
         Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, throwPosition, Vector3f.ZERO, 0, -.1f, 0);
         if (itemEntityHolder == null) {
-            HytaleLogger.getLogger().atInfo().log("generateItemDrop returned null for item=" + itemStack + " at " + throwPosition);
+            //HytaleLogger.getLogger().atInfo().log("generateItemDrop returned null for item=" + itemStack + " at " + throwPosition);
             return null;
         } else {
             ItemComponent itemComponent = (ItemComponent)itemEntityHolder.getComponent(ItemComponent.getComponentType());
@@ -147,7 +147,7 @@ public class ItemUtilsExtended {
                     final Instant currentTime = store.getResource(WorldTimeResource.getResourceType()).getGameTime();
                     Instant despawnTime = currentTime.plusSeconds(5);
                     itemEntityHolder.ensureAndGetComponent(DespawnComponent.getComponentType()).setDespawn(despawnTime);
-                    HytaleLogger.getLogger().atInfo().log("throwItem(generateItemDrop): despawnTime=" + despawnTime);
+                    //HytaleLogger.getLogger().atInfo().log("throwItem(generateItemDrop): despawnTime=" + despawnTime);
                 } catch (Exception ignored) {}
             }
 
@@ -162,7 +162,7 @@ public class ItemUtilsExtended {
                 itemEntityHolder.ensureAndGetComponent(Intangible.getComponentType());
             } catch (Exception ignored) {}
 
-            HytaleLogger.getLogger().atInfo().log("addEntity returned=" + added + " for item=" + itemStack);
+            //HytaleLogger.getLogger().atInfo().log("addEntity returned=" + added + " for item=" + itemStack);
             return added;
         }
     }
@@ -178,10 +178,10 @@ public class ItemUtilsExtended {
         Vector3d throwPosition = transformComponent.getPosition().clone();
         //Model model = modelComponent.getModel();
         //throwPosition.add((double)0.0F, .5f, (double)0.0F).add(throwDirection);
-        HytaleLogger.getLogger().atInfo().log("generateItemDrop (pos overload): pos=" + new Vector3d(pos.x+.5,pos.y +1.5,pos.z+.5) + " item=" + itemStack);
+        //HytaleLogger.getLogger().atInfo().log("generateItemDrop (pos overload): pos=" + new Vector3d(pos.x+.5,pos.y +1.5,pos.z+.5) + " item=" + itemStack);
         Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, new Vector3d(pos.x+.5,pos.y +1.5,pos.z+.5), Vector3f.ZERO, 0, -1, 0);
         if (itemEntityHolder == null) {
-            HytaleLogger.getLogger().atInfo().log("generateItemDrop returned null (pos overload) for item=" + itemStack);
+            //HytaleLogger.getLogger().atInfo().log("generateItemDrop returned null (pos overload) for item=" + itemStack);
             return null;
         } else {
             ItemComponent itemComponent = (ItemComponent)itemEntityHolder.getComponent(ItemComponent.getComponentType());
@@ -198,7 +198,7 @@ public class ItemUtilsExtended {
                     final Instant currentTime = store.getResource(WorldTimeResource.getResourceType()).getGameTime();
                     Instant despawnTime = currentTime.plusSeconds(5);
                     itemEntityHolder.ensureAndGetComponent(DespawnComponent.getComponentType()).setDespawn(despawnTime);
-                    HytaleLogger.getLogger().atInfo().log("throwItem(pos overload): despawnTime=" + despawnTime);
+                    //HytaleLogger.getLogger().atInfo().log("throwItem(pos overload): despawnTime=" + despawnTime);
                 } catch (Exception ignored) {}
             }
 
@@ -211,7 +211,7 @@ public class ItemUtilsExtended {
                 itemEntityHolder.ensureAndGetComponent(Intangible.getComponentType());
             } catch (Exception ignored) {}
 
-            HytaleLogger.getLogger().atInfo().log("addEntity returned=" + added + " (pos overload) for item=" + itemStack);
+            //HytaleLogger.getLogger().atInfo().log("addEntity returned=" + added + " (pos overload) for item=" + itemStack);
             return added;
         }
     }
@@ -237,7 +237,7 @@ public class ItemUtilsExtended {
                 // Despawn visuals after 5 seconds
                 Instant despawnTime = currentTime.plusSeconds(5);
                 itemEntityHolder.ensureAndGetComponent(DespawnComponent.getComponentType()).setDespawn(despawnTime);
-                HytaleLogger.getLogger().atInfo().log("throwItem(side overload): despawnTime=" + despawnTime);
+                //HytaleLogger.getLogger().atInfo().log("throwItem(side overload): despawnTime=" + despawnTime);
                 itemComponent.setPickupDelay(100000000);
                 itemComponent.setRemovedByPlayerPickup(false);
                 itemComponent.computeDynamicLight();
@@ -245,7 +245,7 @@ public class ItemUtilsExtended {
                 ((PhysicsValues)itemEntityHolder.ensureAndGetComponent(PhysicsValues.getComponentType())).replaceValues(pv);
                 // remove physics component as in Ev0Libs so visuals don't collide
                 try { itemEntityHolder.removeComponent(PhysicsValues.getComponentType()); } catch (Exception ignored) {}
-                HytaleLogger.getLogger().atInfo().log(side);
+                //HytaleLogger.getLogger().atInfo().log(side);
 
             }
             // Normalize side comparisons and set a sensible velocity for visuals (match Ev0Libs)
@@ -272,7 +272,7 @@ public class ItemUtilsExtended {
             }
 
             Ref<EntityStore> added = store.addEntity(itemEntityHolder, AddReason.SPAWN);
-            HytaleLogger.getLogger().atInfo().log("throwItem(side overload): addEntity returned=" + added + " for side=" + side + " spawnPos=" + spawnPos + " item=" + itemStack);
+            //HytaleLogger.getLogger().atInfo().log("throwItem(side overload): addEntity returned=" + added + " for side=" + side + " spawnPos=" + spawnPos + " item=" + itemStack);
             return added;
         }
     }
@@ -325,7 +325,7 @@ public class ItemUtilsExtended {
             }
 
             Ref<EntityStore> added = store.addEntity(itemEntityHolder, AddReason.SPAWN);
-            HytaleLogger.getLogger().atInfo().log("throwItem(blockId overload): addEntity returned=" + added + " spawnPos=" + spawnPos + " item=" + itemStack);
+            //HytaleLogger.getLogger().atInfo().log("throwItem(blockId overload): addEntity returned=" + added + " spawnPos=" + spawnPos + " item=" + itemStack);
             return added;
         }
     }
@@ -354,7 +354,7 @@ public class ItemUtilsExtended {
                     final Instant currentTime = store.getResource(WorldTimeResource.getResourceType()).getGameTime();
                     Instant despawnTime = currentTime.plusSeconds(5);
                     itemEntityHolder.ensureAndGetComponent(DespawnComponent.getComponentType()).setDespawn(despawnTime);
-                    HytaleLogger.getLogger().atInfo().log("throwItem(ref,pos overload): despawnTime=" + despawnTime);
+                    //HytaleLogger.getLogger().atInfo().log("throwItem(ref,pos overload): despawnTime=" + despawnTime);
                 } catch (Exception ignored) {}
 
                 TransformComponent tn = new TransformComponent(pos, Vector3f.ZERO);

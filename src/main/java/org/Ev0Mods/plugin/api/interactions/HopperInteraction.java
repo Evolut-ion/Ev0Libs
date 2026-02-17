@@ -37,7 +37,7 @@ public class HopperInteraction extends SimpleBlockInteraction {
 
         try {
             PlayerRef pref = store.getComponent(playerEnt, PlayerRef.getComponentType());
-            HytaleLogger.getLogger().atInfo().log("HopperInteraction: interactWithBlock called, pref=" + pref);
+            //HytaleLogger.getLogger().atInfo().log("HopperInteraction: interactWithBlock called, pref=" + pref);
             if (pref != null) {
                 try {
                     // Resolve held item key so the UI can offer quick-add
@@ -61,15 +61,15 @@ public class HopperInteraction extends SimpleBlockInteraction {
                     }
                     // Open the HyUI-based hopper filter page
                     org.Ev0Mods.plugin.api.ui.HopperUIPage.open(pref, store, vector3i, heldItemId);
-                    HytaleLogger.getLogger().atInfo().log("HopperInteraction: opened HopperUIPage via HyUI PageBuilder, heldItem=" + heldItemId);
+                    //HytaleLogger.getLogger().atInfo().log("HopperInteraction: opened HopperUIPage via HyUI PageBuilder, heldItem=" + heldItemId);
                 } catch (Throwable t) {
-                    HytaleLogger.getLogger().at(Level.WARNING).log("HopperInteraction: failed to open HopperUIPage: " + t.getMessage());
+                    //HytaleLogger.getLogger().at(Level.WARNING).log("HopperInteraction: failed to open HopperUIPage: " + t.getMessage());
                 }
             } else {
-                HytaleLogger.getLogger().at(Level.WARNING).log("HopperInteraction: PlayerRef null when interacting");
+                //HytaleLogger.getLogger().at(Level.WARNING).log("HopperInteraction: PlayerRef null when interacting");
             }
         } catch (Throwable t) {
-            HytaleLogger.getLogger().at(Level.WARNING).log("HopperInteraction: outer failure: " + t.getMessage());
+            //HytaleLogger.getLogger().at(Level.WARNING).log("HopperInteraction: outer failure: " + t.getMessage());
         }
     }
 

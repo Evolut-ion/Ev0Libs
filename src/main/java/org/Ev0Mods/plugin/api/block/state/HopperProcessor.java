@@ -271,18 +271,18 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
     public void onOpen(@NonNullDecl Ref<EntityStore> ref, @NonNullDecl World world, @NonNullDecl Store<EntityStore> store) {
         // Use the PageManager / InteractiveCustomUIPage approach to open the custom page for this hopper
         rf = store.getComponent(ref, PlayerRef.getComponentType());
-        HytaleLogger.getLogger().atInfo().log("HopperProcessor.onOpen called, playerRef=" + rf + " ref=" + ref);
+        //HytaleLogger.getLogger().atInfo().log("HopperProcessor.onOpen called, playerRef=" + rf + " ref=" + ref);
         try {
             if (rf == null) {
-                HytaleLogger.getLogger().at(Level.WARNING).log("PlayerRef is null in onOpen; cannot open UI");
+                //HytaleLogger.getLogger().at(Level.WARNING).log("PlayerRef is null in onOpen; cannot open UI");
                 return;
             }
             Vector3i pos = this.getBlockPosition();
-            HytaleLogger.getLogger().atInfo().log("HopperProcessor.onOpen: opening page for ref=" + ref + " playerRef=" + rf + " pos=" + pos);
+            //HytaleLogger.getLogger().atInfo().log("HopperProcessor.onOpen: opening page for ref=" + ref + " playerRef=" + rf + " pos=" + pos);
             org.Ev0Mods.plugin.api.ui.HopperUIPage.open(rf, store, pos, null);
-            HytaleLogger.getLogger().atInfo().log("Opened HopperUIPage via HyUI PageBuilder for ref=" + ref);
+            //HytaleLogger.getLogger().atInfo().log("Opened HopperUIPage via HyUI PageBuilder for ref=" + ref);
         } catch (Throwable t) {
-            HytaleLogger.getLogger().at(Level.WARNING).log("Failed to open HopperUIPage: " + t.getMessage());
+            //HytaleLogger.getLogger().at(Level.WARNING).log("Failed to open HopperUIPage: " + t.getMessage());
         }
     }
 
@@ -306,7 +306,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
         try {
             return super.canOpen(ref, componentAccessor);
         } catch (Throwable t) {
-            HytaleLogger.getLogger().at(Level.WARNING).log("HopperProcessor.canOpen encountered error: " + t.getMessage());
+            //HytaleLogger.getLogger().at(Level.WARNING).log("HopperProcessor.canOpen encountered error: " + t.getMessage());
             return true;
         }
     }
@@ -474,7 +474,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
      */
     private boolean tryTransferToOrFromContainer(Object state, Vector3i pos, AdjacentSide side,
                                                  Store<EntityStore> entities, boolean exportPhase) {
-        HytaleLogger.getLogger().atInfo().log("tryTransferToOrFromContainer: side=" + side + " exportPhase=" + exportPhase + " state=" + (state == null ? "null" : state.getClass().getSimpleName()));
+        //HytaleLogger.getLogger().atInfo().log("tryTransferToOrFromContainer: side=" + side + " exportPhase=" + exportPhase + " state=" + (state == null ? "null" : state.getClass().getSimpleName()));
         if (!(state instanceof ItemContainerState || state instanceof ProcessingBenchState))
             return false;
 
@@ -497,7 +497,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                 Vector3d velocity = exportPhase ? new Vector3d(-rel.x * 0.35, 0.25, -rel.z * 0.35) : new Vector3d(rel.x * 0.35, 0.25, rel.z * 0.35);
 
                 if (safeStack == null || safeStack.isEmpty()) return null;
-            HytaleLogger.getLogger().atInfo().log("spawnVisual: spawnPos=" + spawnPos + " item=" + safeStack);
+            //HytaleLogger.getLogger().atInfo().log("spawnVisual: spawnPos=" + spawnPos + " item=" + safeStack);
             // Prefer helper behavior when we have nearby targets, but only on export
             if (exportPhase) {
                 List<Ref<EntityStore>> nearby = getAllEntitiesInBox(this, hopperBlock, data.height, (ComponentAccessor<EntityStore>) entities, data.players, data.entities, data.items);
@@ -516,7 +516,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                             default -> oppSide = side.toString();
                         }
                         Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), oppSide, new Vector3d(hopperBlock.x, hopperBlock.y, hopperBlock.z), targetRef, (ComponentAccessor<EntityStore>) entities, safeStack, Vector3d.ZERO, 0f);
-                        HytaleLogger.getLogger().atInfo().log("spawnVisual: helper returned=" + rs + " target=" + targetRef + " oppSide=" + oppSide + " safeStack=" + safeStack);
+                        //HytaleLogger.getLogger().atInfo().log("spawnVisual: helper returned=" + rs + " target=" + targetRef + " oppSide=" + oppSide + " safeStack=" + safeStack);
                         if (rs != null) {
                             l.add(rs);
                             try {
@@ -535,7 +535,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             // Fallback: direct spawn if no targets
             Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop((ComponentAccessor<EntityStore>) entities, safeStack, new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z), Vector3f.ZERO, 0, -1, 0);
             if (itemEntityHolder == null) {
-                HytaleLogger.getLogger().atInfo().log("spawnVisual: generateItemDrop returned null for " + safeStack + " at " + spawnPos);
+                //HytaleLogger.getLogger().atInfo().log("spawnVisual: generateItemDrop returned null for " + safeStack + " at " + spawnPos);
                 return null;
             }
 
@@ -554,7 +554,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             try { itemEntityHolder.ensureAndGetComponent(Intangible.getComponentType()); } catch (Exception ignored) {}
 
             Ref<EntityStore> spawned = entities.addEntity(itemEntityHolder, AddReason.SPAWN);
-            HytaleLogger.getLogger().atInfo().log("spawnVisual: addEntity returned=" + spawned + " for item=" + safeStack);
+            //HytaleLogger.getLogger().atInfo().log("spawnVisual: addEntity returned=" + spawned + " for item=" + safeStack);
             if (spawned != null) {
                 TransformComponent tc = entities.getComponent(spawned, TransformComponent.getComponentType());
                 if (tc != null) tc.setPosition(new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z));
@@ -583,7 +583,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                         // Apply filter: skip items not allowed
                         String probeKeyPb = resolveItemStackKey(stack);
                         if (!isItemAllowedByFilter(probeKeyPb)) {
-                            HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping processing-bench import item=" + probeKeyPb + " mode=" + getFilterMode());
+                            //HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping processing-bench import item=" + probeKeyPb + " mode=" + getFilterMode());
                             continue;
                         }
                         int transferAmount = (int) Math.min(data.tier * 2, Math.min(stack.getQuantity(), MAX_STACK - hopperQty));
@@ -607,7 +607,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                         for (int slot = 0; slot < input.getCapacity(); slot++) {
                             ItemStackSlotTransaction t = input.addItemStackToSlot((short) slot, safeStack);
                             if (t.succeeded()) {
-                                HytaleLogger.getLogger().atInfo().log("spawnVisual: caller=ProcessingBenchExport side=" + side + " pos=" + pos + " safeStack=" + safeStack);
+                                //HytaleLogger.getLogger().atInfo().log("spawnVisual: caller=ProcessingBenchExport side=" + side + " pos=" + pos + " safeStack=" + safeStack);
                                 spawnVisual.apply(safeStack);
                                 this.getItemContainer().removeItemStackFromSlot((short) 0, transferAmount);
                                 return true;
@@ -633,7 +633,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                         // Apply filter: skip items not allowed
                         String probeKey = resolveItemStackKey(stack);
                         if (!isItemAllowedByFilter(probeKey)) {
-                            HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping import item=" + probeKey + " mode=" + getFilterMode());
+                            //HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping import item=" + probeKey + " mode=" + getFilterMode());
                             continue;
                         }
                 int transferAmount = (int) Math.min(data.tier * 2, Math.min(stack.getQuantity(), MAX_STACK - hopperQuantity));
@@ -656,7 +656,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             for (int slot = 0; slot < container.getCapacity(); slot++) {
                 ItemStackSlotTransaction t = container.addItemStackToSlot((short) slot, safeStack);
                 if (t.succeeded()) {
-                    HytaleLogger.getLogger().atInfo().log("spawnVisual: caller=NormalExport side=" + side + " pos=" + pos + " safeStack=" + safeStack);
+                    //HytaleLogger.getLogger().atInfo().log("spawnVisual: caller=NormalExport side=" + side + " pos=" + pos + " safeStack=" + safeStack);
                     spawnVisual.apply(safeStack);
                     this.getItemContainer().removeItemStackFromSlot((short) 0, transferAmount);
                     return true;
@@ -731,7 +731,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
             // Apply filter: do not export items that are blocked by filter
             if (!isItemAllowedByFilter(safeStack.getBlockKey())) {
-                HytaleLogger.getLogger().atInfo().log("Hopper filter: blocking export to processing bench item=" + safeStack.getBlockKey() + " mode=" + getFilterMode());
+                //HytaleLogger.getLogger().atInfo().log("Hopper filter: blocking export to processing bench item=" + safeStack.getBlockKey() + " mode=" + getFilterMode());
                 return false;
             }
 
@@ -769,7 +769,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
             // Apply filter: do not export items that are blocked by filter
             if (!isItemAllowedByFilter(source.getBlockKey())) {
-                HytaleLogger.getLogger().atInfo().log("Hopper filter: blocking export to container item=" + source.getBlockKey() + " mode=" + getFilterMode());
+                //HytaleLogger.getLogger().atInfo().log("Hopper filter: blocking export to container item=" + source.getBlockKey() + " mode=" + getFilterMode());
                 return false;
             }
 
@@ -795,7 +795,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
         // Apply filter: do not export items that are blocked by filter
         if (!isItemAllowedByFilter(source.getBlockKey())) {
-            HytaleLogger.getLogger().atInfo().log("Hopper filter: blocking export to world item=" + source.getBlockKey() + " mode=" + getFilterMode());
+            //HytaleLogger.getLogger().atInfo().log("Hopper filter: blocking export to world item=" + source.getBlockKey() + " mode=" + getFilterMode());
             return false;
         }
 
@@ -899,7 +899,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                 // Apply filter: skip items not allowed
                 if (!isItemAllowedByFilter(stack.getBlockKey())) {
                     String probeKeyPb2 = resolveItemStackKey(stack);
-                    HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping processing-bench import item=" + probeKeyPb2 + " mode=" + getFilterMode());
+                    //HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping processing-bench import item=" + probeKeyPb2 + " mode=" + getFilterMode());
                     continue;
                 }
 
@@ -960,7 +960,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                 // Apply filter: skip items not allowed
                 String otherKey = resolveItemStackKey(otherStack);
                 if (!isItemAllowedByFilter(otherKey)) {
-                    HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping import from other hopper item=" + otherKey + " mode=" + getFilterMode());
+                    //HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping import from other hopper item=" + otherKey + " mode=" + getFilterMode());
                     continue;
                 }
 
@@ -1063,7 +1063,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             // Apply filter: skip items not allowed
             String probeKey2 = resolveItemStackKey(stack);
             if (!isItemAllowedByFilter(probeKey2)) {
-                HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping import from container item=" + probeKey2 + " mode=" + getFilterMode());
+                //HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping import from container item=" + probeKey2 + " mode=" + getFilterMode());
                 continue;
             }
 
@@ -1099,9 +1099,9 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
             for (Ref<EntityStore> target2 : getAllEntitiesInBox(this, pos, data.height,
                     (ComponentAccessor<EntityStore>) entities, data.players, data.entities, data.items)) {
-                    HytaleLogger.getLogger().atInfo().log("spawnVisual: caller=SourceContainerExport side=" + oppSide + " sourceCenter=" + sourceCenter + " target=" + target2 + " safeStack=" + safeStack);
+                    //HytaleLogger.getLogger().atInfo().log("spawnVisual: caller=SourceContainerExport side=" + oppSide + " sourceCenter=" + sourceCenter + " target=" + target2 + " safeStack=" + safeStack);
                     Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), oppSide, new Vector3d(pos.x, pos.y, pos.z), target2, (ComponentAccessor<EntityStore>) entities, safeStack, Vector3d.ZERO, 0f);
-                    HytaleLogger.getLogger().atInfo().log("spawnVisual: helper returned=" + rs + " target=" + target2 + " oppSide=" + oppSide + " safeStack=" + safeStack);
+                    //HytaleLogger.getLogger().atInfo().log("spawnVisual: helper returned=" + rs + " target=" + target2 + " oppSide=" + oppSide + " safeStack=" + safeStack);
                 if (rs != null) { l.add(rs); try { visualMap.put(rs, safeStack); } catch (Exception ignored) {} }
             }
 
