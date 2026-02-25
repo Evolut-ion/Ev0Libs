@@ -79,7 +79,7 @@ public final class HopperUIPage {
                 for (String e : hopper.getWhitelist())
                     if (e != null && e.equalsIgnoreCase(heldId)) return;
                 hopper.addToWhitelist(heldId);
-                LOGGER.atInfo().log("HopperUI: added held item to whitelist: " + heldId);
+                //LOGGER.atInfo().log("HopperUI: added held item to whitelist: " + heldId);
                 refreshLabels(ctx, store, pos);
             });
             builder.addEventListener("addHeldBl", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
@@ -88,7 +88,7 @@ public final class HopperUIPage {
                 for (String e : hopper.getBlacklist())
                     if (e != null && e.equalsIgnoreCase(heldId)) return;
                 hopper.addToBlacklist(heldId);
-                LOGGER.atInfo().log("HopperUI: added held item to blacklist: " + heldId);
+                //LOGGER.atInfo().log("HopperUI: added held item to blacklist: " + heldId);
                 refreshLabels(ctx, store, pos);
             });
         }
@@ -104,7 +104,7 @@ public final class HopperUIPage {
                 for (String e : hopper.getWhitelist())
                     if (e != null && e.equalsIgnoreCase(id)) return;
                 hopper.addToWhitelist(id);
-                LOGGER.atInfo().log("HopperUI: added to whitelist: " + id);
+                //LOGGER.atInfo().log("HopperUI: added to whitelist: " + id);
                 refreshLabels(ctx, store, pos);
             });
         });
@@ -119,7 +119,7 @@ public final class HopperUIPage {
                 for (String e : hopper.getBlacklist())
                     if (e != null && e.equalsIgnoreCase(id)) return;
                 hopper.addToBlacklist(id);
-                LOGGER.atInfo().log("HopperUI: added to blacklist: " + id);
+                //LOGGER.atInfo().log("HopperUI: added to blacklist: " + id);
                 refreshLabels(ctx, store, pos);
             });
         });
@@ -129,14 +129,14 @@ public final class HopperUIPage {
             HopperProcessor hopper = lookupHopper(store, pos);
             if (hopper == null) return;
             String removed = hopper.removeLastFromWhitelist();
-            LOGGER.atInfo().log("HopperUI: removed from whitelist: " + removed);
+            //LOGGER.atInfo().log("HopperUI: removed from whitelist: " + removed);
             refreshLabels(ctx, store, pos);
         });
         builder.addEventListener("removeBl", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
             HopperProcessor hopper = lookupHopper(store, pos);
             if (hopper == null) return;
             String removed = hopper.removeLastFromBlacklist();
-            LOGGER.atInfo().log("HopperUI: removed from blacklist: " + removed);
+            //LOGGER.atInfo().log("HopperUI: removed from blacklist: " + removed);
             refreshLabels(ctx, store, pos);
         });
 
@@ -145,14 +145,14 @@ public final class HopperUIPage {
             HopperProcessor hopper = lookupHopper(store, pos);
             if (hopper == null) return;
             hopper.clearWhitelist();
-            LOGGER.atInfo().log("HopperUI: cleared whitelist");
+            //LOGGER.atInfo().log("HopperUI: cleared whitelist");
             refreshLabels(ctx, store, pos);
         });
         builder.addEventListener("clearBl", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
             HopperProcessor hopper = lookupHopper(store, pos);
             if (hopper == null) return;
             hopper.clearBlacklist();
-            LOGGER.atInfo().log("HopperUI: cleared blacklist");
+            //LOGGER.atInfo().log("HopperUI: cleared blacklist");
             refreshLabels(ctx, store, pos);
         });
 
@@ -161,26 +161,26 @@ public final class HopperUIPage {
             HopperProcessor hopper = lookupHopper(store, pos);
             if (hopper == null) return;
             hopper.setFilterMode("Off");
-            LOGGER.atInfo().log("HopperUI: set mode Off");
+           // LOGGER.atInfo().log("HopperUI: set mode Off");
             refreshLabels(ctx, store, pos);
         });
         builder.addEventListener("modeWl", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
             HopperProcessor hopper = lookupHopper(store, pos);
             if (hopper == null) return;
             hopper.setFilterMode("Whitelist");
-            LOGGER.atInfo().log("HopperUI: set mode Whitelist");
+            //LOGGER.atInfo().log("HopperUI: set mode Whitelist");
             refreshLabels(ctx, store, pos);
         });
         builder.addEventListener("modeBl", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
             HopperProcessor hopper = lookupHopper(store, pos);
             if (hopper == null) return;
             hopper.setFilterMode("Blacklist");
-            LOGGER.atInfo().log("HopperUI: set mode Blacklist");
+            //LOGGER.atInfo().log("HopperUI: set mode Blacklist");
             refreshLabels(ctx, store, pos);
         });
 
         builder.open(store);
-        LOGGER.atInfo().log("HopperUI: opened page for pos=" + pos + " player=" + playerRef);
+        //LOGGER.atInfo().log("HopperUI: opened page for pos=" + pos + " player=" + playerRef);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -198,8 +198,8 @@ public final class HopperUIPage {
                             <p class="section-title">Held Item</p>
                             <p id="heldLabel" class="info-label">In Hand: %s</p>
                             <div class="btn-row">
-                                <button id="addHeldWl" class="small-secondary-button" data-hyui-tooltiptext="Add held item to whitelist" style="padding: 0 8;">+ WL (held)</button>
-                                <button id="addHeldBl" class="small-secondary-button" data-hyui-tooltiptext="Add held item to blacklist" style="padding: 0 8;">+ BL (held)</button>
+                                <button id="addHeldWl" class="small-secondary-button" data-hyui-tooltiptext="Add held item to whitelist" style="padding: 4 12;">+ Whitelist</button>
+                                <button id="addHeldBl" class="small-secondary-button" data-hyui-tooltiptext="Add held item to blacklist" style="padding: 4 12;">+ Blacklist</button>
                             </div>
             """.formatted(heldItem);
         } else {
@@ -212,28 +212,36 @@ public final class HopperUIPage {
                         font-weight: bold;
                         color: #bdcbd3;
                         font-size: 16;
-                        padding-top: 6;
-                        padding-bottom: 2;
+                        padding-top: 12;
+                        padding-bottom: 4;
                     }
                     .info-label {
-                        padding-top: 2;
-                        padding-bottom: 2;
+                        padding-top: 4;
+                        padding-bottom: 4;
                         color: #a0b8c8;
+                        font-size: 14;
                     }
                     .separator {
                         layout-mode: Full;
-                        anchor-height: 1;
+                        anchor-height: 2;
                         background-color: #ffffff(0.15);
+                        margin-top: 8;
+                        margin-bottom: 8;
                     }
                     .btn-row {
                         layout-mode: Left;
-                        padding-top: 4;
-                        padding-bottom: 4;
+                        padding-top: 6;
+                        padding-bottom: 6;
+                        spacing: 8;
+                    }
+                    .input-field {
+                        padding-top: 8;
+                        padding-bottom: 8;
                     }
                 </style>
                 <div class="page-overlay">
-                    <div class="decorated-container" data-hyui-title="Hopper Filter" style="anchor-width: 560; anchor-height: 500;">
-                        <div class="container-contents" style="layout-mode: Top; padding: 12 24;">
+                    <div class="decorated-container" data-hyui-title="Hopper Filter" style="anchor-width: 640; anchor-height: 840;">
+                        <div class="container-contents" style="layout-mode: Top; padding: 16 28;">
 
                             <p class="section-title">Status</p>
                             <p id="modeLabel" class="info-label">Mode: %s</p>
@@ -249,26 +257,32 @@ public final class HopperUIPage {
                             <div class="separator"></div>
 
                             <p class="section-title">Item Entry</p>
-                            <input type="text" id="itemInput" value="" placeholder="Item ID  (e.g. Wood_Ash_Trunk)" style="padding-top: 4; padding-bottom: 8;" />
+                            <div class="input-field">
+                                <input type="text" id="itemInput" value="" placeholder="Item ID (e.g. Wood_Ash_Trunk)" style="width: 100%%; padding: 8 12; font-size: 14;" />
+                            </div>
 
                             <div class="btn-row">
-                                <button id="addWl" class="small-secondary-button" data-hyui-tooltiptext="Add item to whitelist" style="padding: 0 8;">+ Whitelist</button>
-                                <button id="addBl" class="small-secondary-button" data-hyui-tooltiptext="Add item to blacklist" style="padding: 0 8;">+ Blacklist</button>
+                                <button id="addWl" class="secondary-button" data-hyui-tooltiptext="Add item to whitelist" style="padding: 6 16;">+ Whitelist</button>
+                                <button id="addBl" class="secondary-button" data-hyui-tooltiptext="Add item to blacklist" style="padding: 6 16;">+ Blacklist</button>
                             </div>
+                            
                             <div class="btn-row">
-                                <button id="removeWl" class="small-tertiary-button" data-hyui-tooltiptext="Remove last whitelist entry" style="padding: 0 6;">- Last WL</button>
-                                <button id="removeBl" class="small-tertiary-button" data-hyui-tooltiptext="Remove last blacklist entry" style="padding: 0 6;">- Last BL</button>
-                                <button id="clearWl" class="small-tertiary-button" data-hyui-tooltiptext="Clear entire whitelist" style="padding: 0 6;">Clear WL</button>
-                                <button id="clearBl" class="small-tertiary-button" data-hyui-tooltiptext="Clear entire blacklist" style="padding: 0 6;">Clear BL</button>
+                                <button id="removeWl" class="tertiary-button" data-hyui-tooltiptext="Remove last whitelist entry" style="padding: 4 12;">- Remove Last</button>
+                                <button id="removeBl" class="tertiary-button" data-hyui-tooltiptext="Remove last blacklist entry" style="padding: 4 12;">- Remove Last</button>
+                            </div>
+                            
+                            <div class="btn-row">
+                                <button id="clearWl" class="tertiary-button" data-hyui-tooltiptext="Clear entire whitelist" style="padding: 4 12;">Clear Whitelist</button>
+                                <button id="clearBl" class="tertiary-button" data-hyui-tooltiptext="Clear entire blacklist" style="padding: 4 12;">Clear Blacklist</button>
                             </div>
 
                             <div class="separator"></div>
 
                             <p class="section-title">Filter Mode</p>
                             <div class="btn-row">
-                                <button id="modeOff" class="secondary-button" data-hyui-tooltiptext="Disable filtering" style="padding: 0 10;">Off</button>
-                                <button id="modeWl" class="secondary-button" data-hyui-tooltiptext="Only allow whitelisted items" style="padding: 0 10;">Whitelist</button>
-                                <button id="modeBl" class="secondary-button" data-hyui-tooltiptext="Block blacklisted items" style="padding: 0 10;">Blacklist</button>
+                                <button id="modeOff" class="primary-button" data-hyui-tooltiptext="Disable filtering" style="padding: 8 20;">Off</button>
+                                <button id="modeWl" class="primary-button" data-hyui-tooltiptext="Only allow whitelisted items" style="padding: 8 20;">Whitelist</button>
+                                <button id="modeBl" class="primary-button" data-hyui-tooltiptext="Block blacklisted items" style="padding: 8 20;">Blacklist</button>
                             </div>
 
                         </div>
@@ -328,7 +342,7 @@ public final class HopperUIPage {
             Object state = chunk.getState(pos.x, pos.y, pos.z);
             return (state instanceof HopperProcessor hp) ? hp : null;
         } catch (Throwable t) {
-            LOGGER.atWarning().log("HopperUI: failed to lookup hopper at " + pos + ": " + t.getMessage());
+            //LOGGER.atWarning().log("HopperUI: failed to lookup hopper at " + pos + ": " + t.getMessage());
             return null;
         }
     }

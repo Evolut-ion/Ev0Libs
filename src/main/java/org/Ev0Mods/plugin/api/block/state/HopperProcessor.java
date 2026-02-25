@@ -97,6 +97,7 @@ import org.Ev0Mods.plugin.api.system.LiquidPlacingSystem;
 import org.Ev0Mods.plugin.api.util.EntityHelper;
 import org.Ev0Mods.plugin.api.util.ItemUtilsExtended;
 import org.Ev0Mods.plugin.api.util.WorldHelper;
+import org.Ev0Mods.plugin.api.Ev0Config;
 import au.ellie.hyui.builders.PageBuilder;
 import org.checkerframework.checker.nullness.compatqual.NonNullDecl;
 
@@ -373,8 +374,9 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
         boolean doExport = phase == 0;   // export on ticks 0,60,120...
         boolean doImport = phase == 30;  // import on ticks 30,90,150...
 
+
         if (doExport) {
-            // Export phase: try to transfer out and do fluid/block fallback
+            // Export phase: try to transfer items OUT to containers
             for (AdjacentSide side : this.data.exportFaces) {
                 final Vector3i exportPos = new Vector3i(pos.x, pos.y, pos.z)
                         .add(WorldHelper.rotate(side, this.getRotationIndex()).relativePosition);
@@ -383,31 +385,47 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
                 Object state = chunk.getState(exportPos.x, exportPos.y, exportPos.z);
 
+                // Check what's at the target position
+                BlockType targetBlockType = chunk.getBlockType(exportPos.x, exportPos.y, exportPos.z);
+                int targetFluidId = chunk.getFluidId(exportPos.x, exportPos.y, exportPos.z);
+
+                // EXPORT FLUID: If hopper has a bucket and target has fluid, place the fluid (swap bucket for block)
+                // Only run if fluid transfer is enabled in config
+                boolean hasContainer = (state instanceof ItemContainerState || state instanceof ProcessingBenchState);
+                ItemStack currentItem = this.getItemContainer().getItemStack((short) 0);
+                
+                if (Ev0Config.isFluidTransferEnabled() && currentItem != null && !hasContainer && targetFluidId != 0) {
+                    // Place fluid from bucket into world
+                    String itemKey = currentItem.getBlockKey();
+                    if (itemKey != null && itemKey.contains("Bucket") && !itemKey.contains("Empty")) {
+                        int fluidToPlace = 0;
+                        if (itemKey.contains("Water")) fluidToPlace = 7;
+                        else if (itemKey.contains("Lava")) fluidToPlace = 6;
+                        else if (itemKey.contains("Green_Slime")) fluidToPlace = 5;
+                        else if (itemKey.contains("Poison")) fluidToPlace = 4;
+                        else if (itemKey.contains("Tar")) fluidToPlace = 3;
+                        else if (itemKey.contains("Red_Slime")) fluidToPlace = 2;
+                        
+                        if (fluidToPlace != 0) {
+                            // Try to place fluid block - use setBlock with empty then rely on fluid system
+                            // For now, remove the fluid placement and just give empty bucket
+                            // chunk.setBlock(exportPos.x, exportPos.y, exportPos.z, BlockType.EMPTY);
+                            // Replace with empty bucket
+                            this.itemContainer.removeItemStackFromSlot((short) 0, 1);
+                            this.itemContainer.addItemStackToSlot((short) 0, new ItemStack("Container_Bucket", 1, null));
+                            continue;
+                        }
+                    }
+                }
+
+                // Try to transfer to container
                 boolean transferred = tryTransferToOrFromContainer(state, exportPos, side, entities, true);
 
-                // Fluid / block fallback
-                if (!transferred && !this.itemContainer.isEmpty()) {
-                    ItemStack stack = this.getItemContainer().getItemStack((short) 0);
-                    if (stack != null && !(state instanceof ItemContainerState || state instanceof ProcessingBenchState)) {
-                        int fluidId = chunk.getFluidId(exportPos.x, exportPos.y, exportPos.z);
-                        ItemStack fluidStack = null;
-                        switch (fluidId) {
-                            case 2 -> fluidStack = new ItemStack("*Container_Bucket_State_Filled_Red_Slime", 1, null);
-                            case 3 -> fluidStack = new ItemStack("*Container_Bucket_State_Filled_Tar", 1, null);
-                            case 4 -> fluidStack = new ItemStack("*Container_Bucket_State_Filled_Poison", 1, null);
-                            case 5 -> fluidStack = new ItemStack("*Container_Bucket_State_Filled_Green_Slime", 1, null);
-                            case 6 -> fluidStack = new ItemStack("*Container_Bucket_State_Filled_Lava", 1, null);
-                            case 7 -> fluidStack = new ItemStack("*Container_Bucket_State_Filled_Water", 1, null);
-                            default -> fluidStack = null;
-                        }
-
-                        if (fluidStack != null && this.itemContainer.canAddItemStack(fluidStack)) {
-                            this.itemContainer.addItemStackToSlot((short) 0, fluidStack);
-                            chunk.setBlock(exportPos.x, exportPos.y, exportPos.z, BlockType.EMPTY);
-                        } else {
-                            chunk.setBlock(exportPos.x, exportPos.y, exportPos.z, stack.getBlockKey());
-                            this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
-                        }
+                // Place item as block if no container transfer
+                if (!transferred && currentItem != null && !hasContainer && targetFluidId == 0) {
+                    if (chunk.getBlockType(exportPos.x, exportPos.y, exportPos.z) == null) {
+                        chunk.setBlock(exportPos.x, exportPos.y, exportPos.z, currentItem.getBlockKey());
+                        this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
                     }
                 }
 
@@ -416,12 +434,38 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
         }
 
         if (doImport) {
-            // Import phase: try to pull from configured import faces
+            // Import phase: try to pull from configured import faces AND collect fluids from world
             for (AdjacentSide side : this.data.importFaces) {
                 final Vector3i importPos = new Vector3i(pos.x, pos.y, pos.z)
                         .add(WorldHelper.rotate(side, this.getRotationIndex()).relativePosition);
                 final WorldChunk chunk = w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(importPos.x, importPos.z));
                 if (chunk == null) continue;
+
+                // IMPORT FLUID: If there's fluid at target and hopper is empty, create a bucket (collect fluid)
+                // Only run if fluid transfer is enabled in config
+                int targetFluidId = chunk.getFluidId(importPos.x, importPos.y, importPos.z);
+                Object state = chunk.getState(importPos.x, importPos.y, importPos.z);
+                boolean hasContainer = (state instanceof ItemContainerState || state instanceof ProcessingBenchState);
+                ItemStack currentItem = this.getItemContainer().getItemStack((short) 0);
+                
+                if (Ev0Config.isFluidTransferEnabled() && targetFluidId != 0 && currentItem == null && !hasContainer) {
+                    ItemStack bucketStack = null;
+                    switch (targetFluidId) {
+                        case 2 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Red_Slime", 1, null);
+                        case 3 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Tar", 1, null);
+                        case 4 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Poison", 1, null);
+                        case 5 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Green_Slime", 1, null);
+                        case 6 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Lava", 1, null);
+                        case 7 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Water", 1, null);
+                        default -> bucketStack = null;
+                    }
+
+                    if (bucketStack != null) {
+                        this.itemContainer.addItemStackToSlot((short) 0, bucketStack);
+                        chunk.setBlock(importPos.x, importPos.y, importPos.z, BlockType.EMPTY);
+                        continue;
+                    }
+                }
 
                 if (tryImportFromContainer(chunk, importPos, entities, side))
                     break; // one successful import stops further faces this phase
@@ -532,6 +576,12 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                 }
             }
 
+            // Only spawn visual if there are nearby targets in range
+            List<Ref<EntityStore>> nearbyCheck = getAllEntitiesInBox(this, hopperBlock, data.height, (ComponentAccessor<EntityStore>) entities, data.players, data.entities, data.items);
+            if (nearbyCheck.isEmpty()) {
+                return null; // Skip visual spawn entirely when no players/entities are nearby
+            }
+
             // Fallback: direct spawn if no targets
             Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop((ComponentAccessor<EntityStore>) entities, safeStack, new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z), Vector3f.ZERO, 0, -1, 0);
             if (itemEntityHolder == null) {
@@ -580,13 +630,12 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                     for (int slot = 0; slot < output.getCapacity(); slot++) {
                         ItemStack stack = output.getItemStack((short) slot);
                         if (stack == null) continue;
-                        // Apply filter: skip items not allowed
+                        // Apply filter: skip items not allowed by filter
                         String probeKeyPb = resolveItemStackKey(stack);
                         if (!isItemAllowedByFilter(probeKeyPb)) {
-                            //HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping processing-bench import item=" + probeKeyPb + " mode=" + getFilterMode());
                             continue;
                         }
-                        int transferAmount = (int) Math.min(data.tier * 2, Math.min(stack.getQuantity(), MAX_STACK - hopperQty));
+        int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), Math.min(stack.getQuantity(), MAX_STACK - hopperQty));
                         if (transferAmount <= 0) continue;
                         ItemStack safeStack = stack.withQuantity(transferAmount);
                         ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, safeStack);
@@ -600,7 +649,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                 // Export phase: push from hopper into input containers 0 and 1
                 ItemStack have = this.getItemContainer().getItemStack((short) 0);
                 if (have != null && have.getQuantity() > 0) {
-                    int transferAmount = (int) Math.min(data.tier * 2, have.getQuantity());
+                    int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), have.getQuantity());
                     ItemStack safeStack = have.withQuantity(transferAmount);
                     for (int c = 0; c <= 1; c++) {
                         ItemContainer input = bench.getItemContainer().getContainer(c);
@@ -630,13 +679,12 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             for (int slot = 0; slot < container.getCapacity(); slot++) {
                 ItemStack stack = container.getItemStack((short) slot);
                 if (stack == null) continue;
-                        // Apply filter: skip items not allowed
-                        String probeKey = resolveItemStackKey(stack);
-                        if (!isItemAllowedByFilter(probeKey)) {
-                            //HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping import item=" + probeKey + " mode=" + getFilterMode());
-                            continue;
-                        }
-                int transferAmount = (int) Math.min(data.tier * 2, Math.min(stack.getQuantity(), MAX_STACK - hopperQuantity));
+                // Apply filter: skip items not allowed by filter
+                String probeKey = resolveItemStackKey(stack);
+                if (!isItemAllowedByFilter(probeKey)) {
+                    continue;
+                }
+                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), Math.min(stack.getQuantity(), MAX_STACK - hopperQuantity));
                 if (transferAmount <= 0) continue;
                 ItemStack safeStack = stack.withQuantity(transferAmount);
                 ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, safeStack);
@@ -651,7 +699,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
         if (exportPhase) {
             ItemStack have = this.getItemContainer().getItemStack((short) 0);
             if (have != null && have.getQuantity() > 0) {
-            int transferAmount = (int) Math.min(data.tier * 2, have.getQuantity());
+            int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), have.getQuantity());
             ItemStack safeStack = have.withQuantity(transferAmount);
             for (int slot = 0; slot < container.getCapacity(); slot++) {
                 ItemStackSlotTransaction t = container.addItemStackToSlot((short) slot, safeStack);
@@ -896,15 +944,13 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
                 ItemStack stack = output.getItemStack((short) slot);
                 if (stack == null) continue;
-                // Apply filter: skip items not allowed
+                // Apply filter: skip items not allowed by filter
                 if (!isItemAllowedByFilter(stack.getBlockKey())) {
-                    String probeKeyPb2 = resolveItemStackKey(stack);
-                    //HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping processing-bench import item=" + probeKeyPb2 + " mode=" + getFilterMode());
                     continue;
                 }
 
                 int transferAmount =
-                        (int) Math.min(data.tier * 2, stack.getQuantity());
+                        (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
                 if (transferAmount <= 0) continue;
 
                 ItemStack safeStack =
@@ -951,8 +997,13 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             return false;
         }
 
-        // Special-case: importing from another HopperProcessor (pull 1 item and show visual)
+        // Special-case: importing from another HopperProcessor
         if (state instanceof HopperProcessor otherHopper) {
+            final int MAX_STACK = 100;
+            // Use same tier-based transfer as other containers
+            int hopperQty = this.getItemContainer().getItemStack((short) 0) == null ? 0 : this.getItemContainer().getItemStack((short) 0).getQuantity();
+            int maxTransfer = MAX_STACK - hopperQty;
+            
             for (int n = 0; n < otherHopper.getItemContainer().getCapacity(); n++) {
                 ItemStack otherStack = otherHopper.getItemContainer().getItemStack((short) n);
                 if (otherStack == null) continue;
@@ -960,84 +1011,92 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                 // Apply filter: skip items not allowed
                 String otherKey = resolveItemStackKey(otherStack);
                 if (!isItemAllowedByFilter(otherKey)) {
-                    //HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping import from other hopper item=" + otherKey + " mode=" + getFilterMode());
                     continue;
                 }
 
-                // Try to take a single item from the other hopper into this hopper
-                ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, otherStack.withQuantity(1));
+                // Calculate transfer amount based on tier multiplier
+                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), Math.min(otherStack.getQuantity(), maxTransfer));
+                if (transferAmount <= 0) continue;
+
+                // Try to take items from the other hopper into this hopper
+                ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, otherStack.withQuantity(transferAmount));
                 if (t.succeeded()) {
-                    // Spawn visual for the taken item
-                    ItemStack taken = this.getItemContainer().getItemStack((short) 0);
-                    if (taken != null && !taken.isEmpty()) {
-                        List<Ref<EntityStore>> nearby = getAllEntitiesInBox(this, this.getBlockPosition(), data.height, (ComponentAccessor<EntityStore>) entities, data.players, data.entities, data.items);
-                        Ref<EntityStore> targetRef = nearby.isEmpty() ? null : nearby.get(0);
-                        // origin should be the other hopper's center; direction should be toward THIS hopper (opposite side)
-                        Vector3d otherCenter = new Vector3d(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
-                        String oppSide;
-                        switch (side.toString()) {
-                            case "East" -> oppSide = "West";
-                            case "West" -> oppSide = "East";
-                            case "North" -> oppSide = "South";
-                            case "South" -> oppSide = "North";
-                            case "Up" -> oppSide = "Down";
-                            case "Down" -> oppSide = "Up";
-                            default -> oppSide = side.toString();
-                        }
-                        if (targetRef != null) {
-                            // spawn directly at other hopper center toward the target entity
-                            TransformComponent tc = entities.getComponent(targetRef, TransformComponent.getComponentType());
-                            Vector3d targetPosVec = tc != null ? tc.getPosition().clone() : new Vector3d(this.getBlockPosition().x + 0.5, this.getBlockPosition().y + 0.5, this.getBlockPosition().z + 0.5);
-                            double dx = targetPosVec.x - otherCenter.x;
-                            double dy = targetPosVec.y - otherCenter.y;
-                            double dz = targetPosVec.z - otherCenter.z;
-                            double len = Math.sqrt(dx*dx + dy*dy + dz*dz);
-                            double speed = 0.35;
-                            Vector3d vel;
-                            if (len > 1e-6) {
-                                vel = new Vector3d(dx / len * speed, dy / len * speed, dz / len * speed);
-                            } else {
-                                vel = new Vector3d(0, 0.25, 0);
+                    // Only spawn visual if there are nearby players/entities in range
+                    List<Ref<EntityStore>> nearby = getAllEntitiesInBox(this, this.getBlockPosition(), data.height, (ComponentAccessor<EntityStore>) entities, data.players, data.entities, data.items);
+                    boolean hasNearbyTarget = !nearby.isEmpty();
+                    
+                    if (hasNearbyTarget) {
+                        // Spawn visual for the taken item
+                        ItemStack taken = this.getItemContainer().getItemStack((short) 0);
+                        if (taken != null && !taken.isEmpty()) {
+                            Ref<EntityStore> targetRef = nearby.get(0);
+                            // origin should be the other hopper's center; direction should be toward THIS hopper (opposite side)
+                            Vector3d otherCenter = new Vector3d(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
+                            String oppSide;
+                            switch (side.toString()) {
+                                case "East" -> oppSide = "West";
+                                case "West" -> oppSide = "East";
+                                case "North" -> oppSide = "South";
+                                case "South" -> oppSide = "North";
+                                case "Up" -> oppSide = "Down";
+                                case "Down" -> oppSide = "Up";
+                                default -> oppSide = side.toString();
                             }
-
-                            // No visual spawn on import from another hopper; visuals only appear on export.
-                        } else {
-                            // spawn direct item entity at hopper position with directional velocity
-                            Vector3i rel = WorldHelper.rotate(side, this.getRotationIndex()).relativePosition;
-                            // velocity should go from source (other hopper) TO this hopper, so invert rel
-                            Vector3d velocity = new Vector3d(-rel.x * 0.35, 0.25, -rel.z * 0.35);
-                            Vector3d spawnPos = new Vector3d(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
-                            Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop((ComponentAccessor<EntityStore>) entities, taken, new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z), Vector3f.ZERO, 0, -1, 0);
-                            if (itemEntityHolder != null) {
-                                ItemComponent itemComponent = (ItemComponent) itemEntityHolder.getComponent(ItemComponent.getComponentType());
-                                if (itemComponent != null) {
-                                    itemComponent.setPickupDelay(100000000);
-                                    itemComponent.setRemovedByPlayerPickup(false);
-                                    itemComponent.computeDynamicLight();
+                            if (targetRef != null) {
+                                // spawn directly at other hopper center toward the target entity
+                                TransformComponent tc = entities.getComponent(targetRef, TransformComponent.getComponentType());
+                                Vector3d targetPosVec = tc != null ? tc.getPosition().clone() : new Vector3d(this.getBlockPosition().x + 0.5, this.getBlockPosition().y + 0.5, this.getBlockPosition().z + 0.5);
+                                double dx = targetPosVec.x - otherCenter.x;
+                                double dy = targetPosVec.y - otherCenter.y;
+                                double dz = targetPosVec.z - otherCenter.z;
+                                double len = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                                double speed = 0.35;
+                                Vector3d vel;
+                                if (len > 1e-6) {
+                                    vel = new Vector3d(dx / len * speed, dy / len * speed, dz / len * speed);
+                                } else {
+                                    vel = new Vector3d(0, 0.25, 0);
                                 }
-                                try {
-                                    ((PhysicsValues) itemEntityHolder.ensureAndGetComponent(PhysicsValues.getComponentType())).replaceValues(new PhysicsValues(0,0,true));
-                                    ((Velocity) itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(velocity.x, velocity.y, velocity.z);
-                                } catch (Exception ignored) {}
-                                try { itemEntityHolder.tryRemoveComponent(BoundingBox.getComponentType()); } catch (Exception ignored) {}
-                                try { itemEntityHolder.ensureAndGetComponent(Intangible.getComponentType()); } catch (Exception ignored) {}
 
-                                Ref<EntityStore> spawned = entities.addEntity(itemEntityHolder, AddReason.SPAWN);
-                                if (spawned != null) {
-                                    TransformComponent tcSpawned2 = entities.getComponent(spawned, TransformComponent.getComponentType());
-                                    if (tcSpawned2 != null) tcSpawned2.setPosition(new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z));
-                                    l.add(spawned);
+                                // No visual spawn on import from another hopper; visuals only appear on export.
+                            } else {
+                                // spawn direct item entity at hopper position with directional velocity
+                                Vector3i rel = WorldHelper.rotate(side, this.getRotationIndex()).relativePosition;
+                                // velocity should go from source (other hopper) TO this hopper, so invert rel
+                                Vector3d velocity = new Vector3d(-rel.x * 0.35, 0.25, -rel.z * 0.35);
+                                Vector3d spawnPos = new Vector3d(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
+                                Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop((ComponentAccessor<EntityStore>) entities, taken, new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z), Vector3f.ZERO, 0, -1, 0);
+                                if (itemEntityHolder != null) {
+                                    ItemComponent itemComponent = (ItemComponent) itemEntityHolder.getComponent(ItemComponent.getComponentType());
+                                    if (itemComponent != null) {
+                                        itemComponent.setPickupDelay(100000000);
+                                        itemComponent.setRemovedByPlayerPickup(false);
+                                        itemComponent.computeDynamicLight();
+                                    }
                                     try {
-                                        visualMap.put(spawned, taken);
-                                        Instant now = this.es != null ? this.es.getResource(WorldTimeResource.getResourceType()).getGameTime() : Instant.now();
-                                        visualSpawnTimes.put(spawned, now);
+                                        ((PhysicsValues) itemEntityHolder.ensureAndGetComponent(PhysicsValues.getComponentType())).replaceValues(new PhysicsValues(0,0,true));
+                                        ((Velocity) itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(velocity.x, velocity.y, velocity.z);
                                     } catch (Exception ignored) {}
+                                    try { itemEntityHolder.tryRemoveComponent(BoundingBox.getComponentType()); } catch (Exception ignored) {}
+                                    try { itemEntityHolder.ensureAndGetComponent(Intangible.getComponentType()); } catch (Exception ignored) {}
+
+                                    Ref<EntityStore> spawned = entities.addEntity(itemEntityHolder, AddReason.SPAWN);
+                                    if (spawned != null) {
+                                        TransformComponent tcSpawned2 = entities.getComponent(spawned, TransformComponent.getComponentType());
+                                        if (tcSpawned2 != null) tcSpawned2.setPosition(new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z));
+                                        l.add(spawned);
+                                        try {
+                                            visualMap.put(spawned, taken);
+                                            Instant now = this.es != null ? this.es.getResource(WorldTimeResource.getResourceType()).getGameTime() : Instant.now();
+                                            visualSpawnTimes.put(spawned, now);
+                                        } catch (Exception ignored) {}
+                                    }
                                 }
                             }
                         }
                     }
 
-                    otherHopper.getItemContainer().removeItemStackFromSlot((short) n, 1);
+                    otherHopper.getItemContainer().removeItemStackFromSlot((short) n, transferAmount);
                     return true;
                 }
             }
@@ -1060,15 +1119,14 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                 sourceContainer.getItemStack((short) slot);
             if (stack == null) continue;
 
-            // Apply filter: skip items not allowed
+            // Apply filter: skip items not allowed by filter
             String probeKey2 = resolveItemStackKey(stack);
             if (!isItemAllowedByFilter(probeKey2)) {
-                //HytaleLogger.getLogger().atInfo().log("Hopper filter: skipping import from container item=" + probeKey2 + " mode=" + getFilterMode());
                 continue;
             }
 
             int transferAmount =
-                (int) Math.min(data.tier * 2, stack.getQuantity());
+                (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
             if (transferAmount <= 0) continue;
 
             ItemStack safeStack = stack.withQuantity(transferAmount);
@@ -1081,39 +1139,43 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
             if (t.succeeded()) {
 
-            // Visual: throw the item from the source towards nearby targets
-            Vector3i relRot2 = WorldHelper.rotate(side, this.getRotationIndex()).relativePosition;
-            Vector3d velRot2 = new Vector3d(relRot2.x * 0.35, 0.25, relRot2.z * 0.35);
-            // For visuals originating from the source container, spawn at the source center
-            Vector3d sourceCenter = new Vector3d(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
-            String oppSide;
-            switch (side.toString()) {
-                case "East" -> oppSide = "West";
-                case "West" -> oppSide = "East";
-                case "North" -> oppSide = "South";
-                case "South" -> oppSide = "North";
-                case "Up" -> oppSide = "Down";
-                case "Down" -> oppSide = "Up";
-                default -> oppSide = side.toString();
-            }
-
-            for (Ref<EntityStore> target2 : getAllEntitiesInBox(this, pos, data.height,
-                    (ComponentAccessor<EntityStore>) entities, data.players, data.entities, data.items)) {
-                    //HytaleLogger.getLogger().atInfo().log("spawnVisual: caller=SourceContainerExport side=" + oppSide + " sourceCenter=" + sourceCenter + " target=" + target2 + " safeStack=" + safeStack);
-                    Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), oppSide, new Vector3d(pos.x, pos.y, pos.z), target2, (ComponentAccessor<EntityStore>) entities, safeStack, Vector3d.ZERO, 0f);
-                    //HytaleLogger.getLogger().atInfo().log("spawnVisual: helper returned=" + rs + " target=" + target2 + " oppSide=" + oppSide + " safeStack=" + safeStack);
-                if (rs != null) { l.add(rs); try { visualMap.put(rs, safeStack); } catch (Exception ignored) {} }
-            }
-
-            // Optionally remove the visual entity if drop flag is set
-            if (drop) {
-                if (!l.isEmpty()) {
-                Ref<EntityStore> esx = l.getFirst();
-                if (esx != null && esx.isValid()) {
-                    l.removeFirst();
-                    try { visualMap.remove(esx); } catch (Exception ignored) {}
-                    entities.removeEntity(esx, RemoveReason.REMOVE);
+            // Only spawn visual if there are nearby targets in range
+            List<Ref<EntityStore>> nearbyTargets = getAllEntitiesInBox(this, pos, data.height,
+                    (ComponentAccessor<EntityStore>) entities, data.players, data.entities, data.items);
+            if (!nearbyTargets.isEmpty()) {
+                // Visual: throw the item from the source towards nearby targets
+                Vector3i relRot2 = WorldHelper.rotate(side, this.getRotationIndex()).relativePosition;
+                Vector3d velRot2 = new Vector3d(relRot2.x * 0.35, 0.25, relRot2.z * 0.35);
+                // For visuals originating from the source container, spawn at the source center
+                Vector3d sourceCenter = new Vector3d(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
+                String oppSide;
+                switch (side.toString()) {
+                    case "East" -> oppSide = "West";
+                    case "West" -> oppSide = "East";
+                    case "North" -> oppSide = "South";
+                    case "South" -> oppSide = "North";
+                    case "Up" -> oppSide = "Down";
+                    case "Down" -> oppSide = "Up";
+                    default -> oppSide = side.toString();
                 }
+
+                for (Ref<EntityStore> target2 : nearbyTargets) {
+                        //HytaleLogger.getLogger().atInfo().log("spawnVisual: caller=SourceContainerExport side=" + oppSide + " sourceCenter=" + sourceCenter + " target=" + target2 + " safeStack=" + safeStack);
+                        Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), oppSide, new Vector3d(pos.x, pos.y, pos.z), target2, (ComponentAccessor<EntityStore>) entities, safeStack, Vector3d.ZERO, 0f);
+                        //HytaleLogger.getLogger().atInfo().log("spawnVisual: helper returned=" + rs + " target=" + target2 + " oppSide=" + oppSide + " safeStack=" + safeStack);
+                    if (rs != null) { l.add(rs); try { visualMap.put(rs, safeStack); } catch (Exception ignored) {} }
+                }
+
+                // Optionally remove the visual entity if drop flag is set
+                if (drop) {
+                    if (!l.isEmpty()) {
+                    Ref<EntityStore> esx = l.getFirst();
+                    if (esx != null && esx.isValid()) {
+                        l.removeFirst();
+                        try { visualMap.remove(esx); } catch (Exception ignored) {}
+                        entities.removeEntity(esx, RemoveReason.REMOVE);
+                    }
+                    }
                 }
             }
 

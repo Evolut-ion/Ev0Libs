@@ -1,0 +1,196 @@
+package org.Ev0Mods.plugin.api;
+
+import com.hypixel.hytale.logger.HytaleLogger;
+
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Properties;
+
+/**
+ * Global configuration for Ev0Lib mod
+ * Values are loaded from config.properties in the server config directory
+ * Server managers can edit this file to enable/disable features
+ */
+public class Ev0Config {
+    
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+    private static final String CONFIG_FILE_NAME = "Ev0Lib_config.properties";
+    
+    // Default values
+    private static int tierMultiplier = 4; // Default value - transfers tier * 4 items per tick
+    private static boolean fluidTransferEnabled = true; // Enable/disable fluid import/export
+    private static boolean debugMode = false; // Enable debug logging
+    
+    // Config file path (set by plugin)
+    private static Path configFilePath = null;
+    private static boolean initialized = false;
+    
+    public Ev0Config() {}
+    
+    /**
+     * Initialize the config system - called by the plugin on startup
+     * @param configDirPath Path to the server's config directory
+     */
+    public static void initialize(String configDirPath) {
+        if (initialized) {
+            LOGGER.atWarning().log("Ev0Config already initialized!");
+            return;
+        }
+        
+        configFilePath = Paths.get(configDirPath, CONFIG_FILE_NAME);
+        loadConfig();
+        initialized = true;
+        LOGGER.atInfo().log("Ev0Config initialized from: " + configFilePath.toAbsolutePath());
+    }
+    
+    /**
+     * Load config from file, or create default if not exists
+     */
+    private static void loadConfig() {
+        Properties props = new Properties();
+        
+        try {
+            if (Files.exists(configFilePath)) {
+                // Load existing config
+                try (InputStream input = Files.newInputStream(configFilePath)) {
+                    props.load(input);
+                    loadValuesFromProperties(props);
+                    LOGGER.atInfo().log("Loaded config from: " + configFilePath);
+                }
+            } else {
+                // Create default config file
+                saveDefaultConfig(props);
+                LOGGER.atInfo().log("Created default config at: " + configFilePath);
+            }
+        } catch (Exception e) {
+            LOGGER.atWarning().log("Error loading config: " + e.getMessage());
+            // Use defaults on error
+        }
+    }
+    
+    /**
+     * Load values from Properties
+     */
+    private static void loadValuesFromProperties(Properties props) {
+        // Tier Multiplier
+        String tierMult = props.getProperty("tierMultiplier");
+        if (tierMult != null) {
+            try {
+                tierMultiplier = Integer.parseInt(tierMult.trim());
+            } catch (NumberFormatException e) {
+                LOGGER.atWarning().log("Invalid tierMultiplier value, using default: " + tierMult);
+            }
+        }
+        
+        // Fluid Transfer
+        String fluidTransfer = props.getProperty("fluidTransferEnabled");
+        if (fluidTransfer != null) {
+            fluidTransferEnabled = Boolean.parseBoolean(fluidTransfer.trim());
+        }
+        
+        // Debug Mode
+        String debug = props.getProperty("debugMode");
+        if (debug != null) {
+            debugMode = Boolean.parseBoolean(debug.trim());
+        }
+    }
+    
+    /**
+     * Save the default config file
+     */
+    private static void saveDefaultConfig(Properties props) {
+        props.setProperty("tierMultiplier", String.valueOf(tierMultiplier));
+        props.setProperty("fluidTransferEnabled", String.valueOf(fluidTransferEnabled));
+        props.setProperty("debugMode", String.valueOf(debugMode));
+        
+        try {
+            // Ensure parent directory exists
+            if (configFilePath.getParent() != null) {
+                Files.createDirectories(configFilePath.getParent());
+            }
+            try (OutputStream output = Files.newOutputStream(configFilePath)) {
+                props.store(output, "Ev0Lib Configuration File\n" +
+                    "# Edit these values to enable/disable features\n" +
+                    "# tierMultiplier: How many items per tier to transfer per tick (default: 4)\n" +
+                    "# fluidTransferEnabled: Enable/disable fluid import/export via hoppers (default: true)\n" +
+                    "# debugMode: Enable debug logging (default: false)");
+            }
+        } catch (IOException e) {
+            LOGGER.atWarning().log("Error saving default config: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Reload config from file (can be called at runtime)
+     */
+    public static void reload() {
+        if (!initialized) {
+            LOGGER.atWarning().log("Ev0Config not initialized, cannot reload!");
+            return;
+        }
+        
+        loadConfig();
+        LOGGER.atInfo().log("Ev0Config reloaded");
+    }
+    
+    /**
+     * Save current values to config file
+     */
+    public static void save() {
+        if (!initialized) {
+            LOGGER.atWarning().log("Ev0Config not initialized, cannot save!");
+            return;
+        }
+        
+        Properties props = new Properties();
+        props.setProperty("tierMultiplier", String.valueOf(tierMultiplier));
+        props.setProperty("fluidTransferEnabled", String.valueOf(fluidTransferEnabled));
+        props.setProperty("debugMode", String.valueOf(debugMode));
+        
+        try {
+            try (OutputStream output = Files.newOutputStream(configFilePath)) {
+                props.store(output, "Ev0Lib Configuration File\n" +
+                    "# Edit these values to enable/disable features\n" +
+                    "# tierMultiplier: How many items per tier to transfer per tick (default: 4)\n" +
+                    "# fluidTransferEnabled: Enable/disable fluid import/export via hoppers (default: true)\n" +
+                    "# debugMode: Enable debug logging (default: false)");
+            }
+            LOGGER.atInfo().log("Ev0Config saved");
+        } catch (IOException e) {
+            LOGGER.atWarning().log("Error saving config: " + e.getMessage());
+        }
+    }
+    
+    // Getters
+    
+    public static int getTierMultiplier() {
+        return tierMultiplier;
+    }
+    
+    public static boolean isFluidTransferEnabled() {
+        return fluidTransferEnabled;
+    }
+    
+    public static boolean isDebugMode() {
+        return debugMode;
+    }
+    
+    // Setters with save
+    
+    public static void setTierMultiplier(int value) {
+        tierMultiplier = value;
+        if (initialized) save();
+    }
+    
+    public static void setFluidTransferEnabled(boolean enabled) {
+        fluidTransferEnabled = enabled;
+        if (initialized) save();
+    }
+    
+    public static void setDebugMode(boolean enabled) {
+        debugMode = enabled;
+        if (initialized) save();
+    }
+}

@@ -7,6 +7,7 @@ import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.world.meta.BlockStateRegistry;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import org.Ev0Mods.plugin.api.Ev0Config;
 import org.Ev0Mods.plugin.api.block.state.HopperProcessor;
 import org.Ev0Mods.plugin.api.codec.ItemHandler;
 import org.Ev0Mods.plugin.api.component.FluidComponent;
@@ -36,6 +37,13 @@ public class Ev0Lib extends JavaPlugin {
     @Override
     protected void setup() {
         LOGGER.atInfo().log("Setting up plugin " + this.getName());
+        
+        // Initialize config system
+        String configDir = this.getDataDirectory().toAbsolutePath().toString();
+        Ev0Config.initialize(configDir);
+        LOGGER.atInfo().log("Config initialized with tierMultiplier=" + Ev0Config.getTierMultiplier() + 
+                           ", fluidTransferEnabled=" + Ev0Config.isFluidTransferEnabled());
+        
         final var itemOutputCodec = this.getCodecRegistry(ItemHandler.CODEC);
         this.getChunkStoreRegistry().registerSystem(new LiquidPlacingSystem());
         final BlockStateRegistry blockStateRegistry = this.getBlockStateRegistry();
