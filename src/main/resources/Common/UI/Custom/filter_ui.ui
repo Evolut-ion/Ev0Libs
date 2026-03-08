@@ -6,10 +6,10 @@ Group #root {
   Anchor: (Left: 30, Right: 30, Top: 30, Bottom: 30);
   Group {
     LayoutMode: Center;
-    Anchor: (Height: 420, Left: 0, Right: 0, Top: 0);
+    Anchor: (Height: 780, Left: 0, Right: 0, Top: 0);
     Group {
     LayoutMode: Top;
-      Anchor: (Width: 500, Left: 0, Top: 0, Bottom: 0);
+      Anchor: (Width: 820, Left: 0, Top: 0, Bottom: 0);
       Background: (PatchStyle(TexturePath: "filter_bg.png"));
       Label {
         Padding: (Bottom: 8);
@@ -42,7 +42,7 @@ Group #root {
       }
       Group {
         LayoutMode: Center;
-        Anchor: (Height: 160, Left: 0, Right: 0, Top: 0);
+        Anchor: (Height: 280, Left: 0, Right: 0, Top: 0);
         Group {
           LayoutMode: Top;
           Anchor: (Width: 240, Left: 0, Top: 0, Bottom: 0);
@@ -56,13 +56,13 @@ Group #root {
           }
           Group {
             LayoutMode: Center;
-            Anchor: (Height: 36, Left: 0, Right: 0, Top: 6);
+            Anchor: (Height: 40, Left: 0, Right: 0, Top: 8);
             Button #ev0RemoveWl {
-              Anchor: (Width: 140, Height: 32, Left: 0, Top: 0);
+              Anchor: (Width: 160, Height: 38, Left: 0, Top: 0);
               Label { Text: "Remove Last"; }
             }
             Button #ev0ClearWl {
-              Anchor: (Width: 80, Height: 32, Left: 8, Top: 0);
+              Anchor: (Width: 90, Height: 38, Left: 10, Top: 0);
               Label { Text: "Clear"; }
             }
           }
@@ -80,13 +80,13 @@ Group #root {
           }
           Group {
             LayoutMode: Center;
-            Anchor: (Height: 36, Left: 0, Right: 0, Top: 6);
+            Anchor: (Height: 40, Left: 0, Right: 0, Top: 8);
             Button #ev0RemoveBl {
-              Anchor: (Width: 140, Height: 32, Left: 0, Top: 0);
+              Anchor: (Width: 160, Height: 38, Left: 0, Top: 0);
               Label { Text: "Remove Last"; }
             }
             Button #ev0ClearBl {
-              Anchor: (Width: 80, Height: 32, Left: 8, Top: 0);
+              Anchor: (Width: 90, Height: 38, Left: 10, Top: 0);
               Label { Text: "Clear"; }
             }
           }
@@ -99,40 +99,40 @@ Group #root {
       }
       Group {
         LayoutMode: Center;
-        Anchor: (Height: 44, Left: 0, Right: 0, Top: 0);
+        Anchor: (Height: 50, Left: 0, Right: 0, Top: 0);
         TextField #Item {
-          Anchor: (Width: 320, Height: 44, Left: 0, Top: 0);
+          Anchor: (Width: 380, Height: 50, Left: 0, Top: 0);
           PlaceholderText: "item id e.g. minecraft:stone";
           Background: (PatchStyle(TexturePath: "filter_bg.png"));
           // Slight padding so text isn't tight to edge
-          Padding: (Left: 8, Right: 8);
+          Padding: (Left: 10, Right: 10);
         }
         Button #ev0AddWl {
-          Anchor: (Width: 110, Height: 44, Left: 10, Top: 0);
+          Anchor: (Width: 130, Height: 50, Left: 12, Top: 0);
           Background: (PatchStyle(TexturePath: "filter_bg.png"));
           Label { Text: "Add WL"; }
         }
         Button #ev0AddBl {
-          Anchor: (Width: 110, Height: 44, Left: 10, Top: 0);
+          Anchor: (Width: 130, Height: 50, Left: 12, Top: 0);
           Background: (PatchStyle(TexturePath: "filter_bg.png"));
           Label { Text: "Add BL"; }
         }
       }
       Group {
         LayoutMode: Center;
-        Anchor: (Height: 44, Left: 0, Right: 0, Top: 10);
+        Anchor: (Height: 50, Left: 0, Right: 0, Top: 12);
         Button #ev0ModeOff {
-          Anchor: (Width: 120, Height: 44, Left: 0, Top: 0);
+          Anchor: (Width: 140, Height: 50, Left: 0, Top: 0);
           Background: (PatchStyle(TexturePath: "filter_bg.png"));
           Label { Text: "Off"; }
         }
         Button #ev0ModeWhitelist {
-          Anchor: (Width: 150, Height: 44, Left: 10, Top: 0);
+          Anchor: (Width: 170, Height: 50, Left: 12, Top: 0);
           Background: (PatchStyle(TexturePath: "filter_bg.png"));
           Label { Text: "Whitelist"; }
         }
         Button #ev0ModeBlacklist {
-          Anchor: (Width: 150, Height: 44, Left: 10, Top: 0);
+          Anchor: (Width: 170, Height: 50, Left: 12, Top: 0);
           Background: (PatchStyle(TexturePath: "filter_bg.png"));
           Label { Text: "Blacklist"; }
         }

@@ -71,6 +71,9 @@ dependencies {
     
     // YAML config parsing
     implementation "org.yaml:snakeyaml:2.2"
+
+    // ArcIO optional integration (compile-only; not bundled; absent at runtime when ArcIO mod is not installed)
+    implementation "curse.maven:arcio-1473915:7692946"
 }
 
 // Updates the manifest.json file with the latest properties defined in the

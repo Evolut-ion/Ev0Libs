@@ -52,6 +52,20 @@ public class Ev0Lib extends JavaPlugin {
                 .registerComponent(FluidComponent.class, FluidComponent::new);
         this.getCodecRegistry(Interaction.CODEC).<WrenchInteraction>register("WrenchInteraction", WrenchInteraction.class, WrenchInteraction.CODEC);
         this.getCodecRegistry(Interaction.CODEC).register("HopperInteraction", HopperInteraction.class,  HopperInteraction.CODEC);
+
+        // Register ArcIO mechanism if ArcIO is installed.
+        // Uses reflection so the plugin loads normally when ArcIO is absent.
+        try {
+            Class.forName("voidbond.arcio.ArcioPlugin");
+            Class.forName("org.Ev0Mods.plugin.api.block.state.HopperArcioRegistration")
+                    .getMethod("register")
+                    .invoke(null);
+            LOGGER.atInfo().log("[Ev0Lib] Registered ArcIO mechanism: Hopper");
+        } catch (ClassNotFoundException ignored) {
+            LOGGER.atInfo().log("[Ev0Lib] ArcIO not found - skipping mechanism registration");
+        } catch (Exception e) {
+            LOGGER.atWarning().log("[Ev0Lib] Failed to register ArcIO mechanism: " + e.getMessage());
+        }
     }
     public static String idPascal(String id) {
         return GROUP + NAME + id;

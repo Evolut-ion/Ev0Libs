@@ -325,6 +325,10 @@ public class ItemUtilsExtended {
             }
 
             Ref<EntityStore> added = store.addEntity(itemEntityHolder, AddReason.SPAWN);
+            // Mark as intangible visual so it cannot be picked up by hoppers or players,
+            // consistent with all other throwItem overloads.
+            try { itemEntityHolder.tryRemoveComponent(BoundingBox.getComponentType()); } catch (Exception ignored) {}
+            try { itemEntityHolder.ensureAndGetComponent(Intangible.getComponentType()); } catch (Exception ignored) {}
             //HytaleLogger.getLogger().atInfo().log("throwItem(blockId overload): addEntity returned=" + added + " spawnPos=" + spawnPos + " item=" + itemStack);
             return added;
         }
