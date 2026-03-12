@@ -1,7 +1,7 @@
 {
     "Group": "Ev0sMods",
     "Name": "Ev0Lib",
-    "Version": "1.4.1",
+    "Version": "1.4.2",
     "Description": "Ev0's Libs",
     "Authors": [
         {
@@ -15,6 +15,9 @@
     },
     "OptionalDependencies": {
         
+    },
+    "UpdateChecker": {
+    "Curseforge": "1432575"
     },
     "DisabledByDefault": false,
     "Main": "org.Ev0Mods.plugin.Ev0Lib",
