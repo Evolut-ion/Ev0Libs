@@ -97,6 +97,7 @@ import org.Ev0Mods.plugin.api.codec.Codecs;
 import org.Ev0Mods.plugin.api.codec.IdOutput;
 import org.Ev0Mods.plugin.api.codec.ItemHandler;
 import org.Ev0Mods.plugin.api.component.FluidComponent;
+import net.crepe.inventory.IDrawerContainer;
 import org.Ev0Mods.plugin.api.system.LiquidPlacingSystem;
 import org.Ev0Mods.plugin.api.util.EntityHelper;
 import org.Ev0Mods.plugin.api.util.ItemUtilsExtended;
@@ -186,6 +187,16 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
         try { Class.forName("voidbond.arcio.components.ArcioMechanismComponent"); found = true; }
         catch (ClassNotFoundException ignored) {}
         ARCIO_PRESENT = found;
+    }
+
+    // ── Simple Drawers integration ────────────────────────────────────────────
+    /** True when Simple Drawers is present on the server classpath (detected once per class load). */
+    public static final boolean SIMPLE_DRAWERS_PRESENT;
+    static {
+        boolean found = false;
+        try { Class.forName("net.crepe.inventory.IDrawerContainer"); found = true; }
+        catch (ClassNotFoundException ignored) {}
+        SIMPLE_DRAWERS_PRESENT = found;
     }
     /** Whether ArcIO mechanism & UUID components have been attached to this block entity. */
     private boolean arcioInitialized = false;
@@ -544,9 +555,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
         boolean isProcessingBench = state instanceof ProcessingBenchState;
         ProcessingBenchState bench = isProcessingBench ? (ProcessingBenchState) state : null;
 
-        final int MAX_STACK = 100;
-
-            // Helper to spawn visual thrown items: compute velocity from side and always spawn an entity
+        // Helper to spawn visual thrown items: compute velocity from side and always spawn an entity
         Function<ItemStack, Void> spawnVisual = (safeStack) -> {
                 Vector3i rel = WorldHelper.rotate(side, this.getRotationIndex()).relativePosition;
                 // compute spawn origin and velocity depending on whether we're exporting or importing
@@ -641,26 +650,23 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
         if (isProcessingBench) {
             ItemContainer output = bench.getItemContainer().getContainer(2);
             if (!exportPhase) {
-                // Import phase: pull from output into hopper if hopper has room
-                ItemStack hopperStack = this.getItemContainer().getItemStack((short) 0);
-                int hopperQty = hopperStack == null ? 0 : hopperStack.getQuantity();
-                if (hopperQty < MAX_STACK) {
-                    for (int slot = 0; slot < output.getCapacity(); slot++) {
-                        ItemStack stack = output.getItemStack((short) slot);
-                        if (stack == null) continue;
-                        // Apply filter: skip items not allowed by filter
-                        String probeKeyPb = resolveItemStackKey(stack);
-                        if (!isItemAllowedByFilter(probeKeyPb)) {
-                            continue;
-                        }
-        int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), Math.min(stack.getQuantity(), MAX_STACK - hopperQty));
-                        if (transferAmount <= 0) continue;
-                        ItemStack safeStack = stack.withQuantity(transferAmount);
-                        ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, safeStack);
-                        if (t.succeeded()) {
-                            output.removeItemStackFromSlot((short) slot, transferAmount);
-                            return true;
-                        }
+                // Import phase: pull from output into hopper if the hopper slot can accept items.
+                // Let addItemStackToSlot decide capacity — supports containers with custom stack limits.
+                for (int slot = 0; slot < output.getCapacity(); slot++) {
+                    ItemStack stack = output.getItemStack((short) slot);
+                    if (stack == null) continue;
+                    // Apply filter: skip items not allowed by filter
+                    String probeKeyPb = resolveItemStackKey(stack);
+                    if (!isItemAllowedByFilter(probeKeyPb)) {
+                        continue;
+                    }
+                    int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
+                    if (transferAmount <= 0) continue;
+                    ItemStack safeStack = stack.withQuantity(transferAmount);
+                    ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, safeStack);
+                    if (t.succeeded()) {
+                        output.removeItemStackFromSlot((short) slot, transferAmount);
+                        return true;
                     }
                 }
             } else {
@@ -688,12 +694,100 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
         }
 
         // Normal container handling: try import first (if hopper has room), then export
+        // Capacity is determined by addItemStackToSlot itself — supports containers like Simple Drawers
+        // that override their own max stack, rather than relying on a hardcoded limit.
         ItemContainer container = ((ItemContainerState) state).getItemContainer();
-        ItemStack hopper = this.getItemContainer().getItemStack((short) 0);
-        int hopperQuantity = hopper == null ? 0 : hopper.getQuantity();
+
+        // Simple Drawers: use the IDrawerContainer API so transfer respects each slot's
+        // actual capacity (which can be thousands on upgraded drawers/controllers).
+        if (SIMPLE_DRAWERS_PRESENT && container instanceof IDrawerContainer drawerContainer) {
+            if (!exportPhase) {
+                // Import: pull from drawer slot into hopper using the drawer's slot API
+                for (short slot = 0; slot < drawerContainer.getSlotCount(); slot++) {
+                    ItemStack slotItem = drawerContainer.getSlotItem(slot);
+                    int slotQty = drawerContainer.getSlotQuantity(slot);
+                    if (slotItem == null || slotQty <= 0) continue;
+                    String probeKey = resolveItemStackKey(slotItem);
+                    if (!isItemAllowedByFilter(probeKey)) continue;
+                    int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), slotQty);
+                    if (transferAmount <= 0) continue;
+                    ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, slotItem.withQuantity(transferAmount));
+                    if (t.succeeded()) {
+                        final short fSlot = slot;
+                        final int fNewQty = slotQty - transferAmount;
+                        final ItemStack fSlotItem = slotItem;
+                        drawerContainer.writeAction(() -> {
+                            drawerContainer.setSlot(fSlot, fSlotItem.withQuantity(fNewQty));
+                            return null;
+                        });
+                        return true;
+                    }
+                }
+                return false;
+            } else {
+                // Export: push from hopper into drawer using only IDrawerContainer interface methods.
+                ItemStack have = this.getItemContainer().getItemStack((short) 0);
+                if (have != null && have.getQuantity() > 0) {
+                    int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), have.getQuantity());
+
+                    // Pass 1: prefer an existing slot whose locked type matches the incoming item.
+                    short matchedSlot = -1;
+                    int matchedQty = 0;
+                    int matchedCap = 0;
+                    for (short slot = 0; slot < drawerContainer.getSlotCount(); slot++) {
+                        ItemStack slotItem = drawerContainer.getSlotItem(slot);
+                        if (ItemStack.isEmpty(slotItem)) continue; // uninitialized — skip in pass 1
+                        // Type must match first (same check SD does internally)
+                        if (!slotItem.isStackableWith(have)) continue;
+                        int slotQty = drawerContainer.getSlotQuantity(slot);
+                        int slotCap = drawerContainer.getSlotStackCapacity(slot);
+                        if (slotCap - slotQty <= 0) continue;
+                        if (drawerContainer.testCantAddToSlot(slot, have, slotItem)) continue;
+                        matchedSlot = slot;
+                        matchedQty = slotQty;
+                        matchedCap = slotCap;
+                        break;
+                    }
+
+                    // Pass 2: if nothing matched, fall back to the first truly empty slot.
+                    if (matchedSlot == -1) {
+                        for (short slot = 0; slot < drawerContainer.getSlotCount(); slot++) {
+                            ItemStack slotItem = drawerContainer.getSlotItem(slot);
+                            if (!ItemStack.isEmpty(slotItem)) continue; // already has a type lock — skip
+                            int slotQty = drawerContainer.getSlotQuantity(slot);
+                            int slotCap = drawerContainer.getSlotStackCapacity(slot);
+                            if (slotCap - slotQty <= 0) continue;
+                            matchedSlot = slot;
+                            matchedQty = slotQty;
+                            matchedCap = slotCap;
+                            break;
+                        }
+                    }
+
+                    if (matchedSlot != -1) {
+                        int room = matchedCap - matchedQty;
+                        int actualTransfer = Math.min(transferAmount, room);
+                        if (actualTransfer > 0) {
+                            final short fSlot = matchedSlot;
+                            final int fNewQty = matchedQty + actualTransfer;
+                            final int fActual = actualTransfer;
+                            final ItemStack fHave = have;
+                            drawerContainer.writeAction(() -> {
+                                drawerContainer.setSlot(fSlot, fHave.withQuantity(fNewQty));
+                                return null;
+                            });
+                            spawnVisual.apply(have.withQuantity(fActual));
+                            this.getItemContainer().removeItemStackFromSlot((short) 0, fActual);
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+        }
 
         // Import (only during import phase)
-        if (!exportPhase && hopperQuantity < MAX_STACK) {
+        if (!exportPhase) {
             for (int slot = 0; slot < container.getCapacity(); slot++) {
                 ItemStack stack = container.getItemStack((short) slot);
                 if (stack == null) continue;
@@ -702,7 +796,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                 if (!isItemAllowedByFilter(probeKey)) {
                     continue;
                 }
-                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), Math.min(stack.getQuantity(), MAX_STACK - hopperQuantity));
+                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
                 if (transferAmount <= 0) continue;
                 ItemStack safeStack = stack.withQuantity(transferAmount);
                 ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, safeStack);
@@ -1061,11 +1155,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
         // Special-case: importing from another HopperProcessor
         if (state instanceof HopperProcessor otherHopper) {
-            final int MAX_STACK = 100;
-            // Use same tier-based transfer as other containers
-            int hopperQty = this.getItemContainer().getItemStack((short) 0) == null ? 0 : this.getItemContainer().getItemStack((short) 0).getQuantity();
-            int maxTransfer = MAX_STACK - hopperQty;
-            
+            // Let addItemStackToSlot decide whether the hopper slot can accept — no hardcoded cap.
             for (int n = 0; n < otherHopper.getItemContainer().getCapacity(); n++) {
                 ItemStack otherStack = otherHopper.getItemContainer().getItemStack((short) n);
                 if (otherStack == null) continue;
@@ -1076,8 +1166,8 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                     continue;
                 }
 
-                // Calculate transfer amount based on tier multiplier
-                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), Math.min(otherStack.getQuantity(), maxTransfer));
+                // Calculate transfer amount based on tier multiplier; container decides actual capacity
+                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), otherStack.getQuantity());
                 if (transferAmount <= 0) continue;
 
                 // Try to take items from the other hopper into this hopper
@@ -1122,6 +1212,49 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
         ItemContainer sourceContainer =
             containerState.getItemContainer();
+
+        // Simple Drawers: use the IDrawerContainer API so we read the actual slot quantity
+        // (which can be thousands on upgraded drawers/controllers) and remove via setSlot.
+        if (SIMPLE_DRAWERS_PRESENT && sourceContainer instanceof IDrawerContainer drawerContainer) {
+            for (short slot = 0; slot < drawerContainer.getSlotCount(); slot++) {
+                ItemStack slotItem = drawerContainer.getSlotItem(slot);
+                int slotQty = drawerContainer.getSlotQuantity(slot);
+                if (slotItem == null || slotQty <= 0) continue;
+                String probeKey2 = resolveItemStackKey(slotItem);
+                if (!isItemAllowedByFilter(probeKey2)) continue;
+                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), slotQty);
+                if (transferAmount <= 0) continue;
+                ItemStack safeStack = slotItem.withQuantity(transferAmount);
+                ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, safeStack);
+                if (t.succeeded()) {
+                    if (!nearbyBuffer.isEmpty()) {
+                        String oppSide;
+                        switch (side.toString()) {
+                            case "East" -> oppSide = "West";
+                            case "West" -> oppSide = "East";
+                            case "North" -> oppSide = "South";
+                            case "South" -> oppSide = "North";
+                            case "Up" -> oppSide = "Down";
+                            case "Down" -> oppSide = "Up";
+                            default -> oppSide = side.toString();
+                        }
+                        for (Ref<EntityStore> target2 : nearbyBuffer) {
+                            Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), oppSide, new Vector3d(pos.x, pos.y, pos.z), target2, (ComponentAccessor<EntityStore>) entities, safeStack, Vector3d.ZERO, 0f);
+                            if (rs != null) { l.add(rs); try { visualMap.put(rs, safeStack); } catch (Exception ignored) {} }
+                        }
+                    }
+                    final short fSlot = slot;
+                    final int fNewQty = slotQty - transferAmount;
+                    final ItemStack fSlotItem = slotItem;
+                    drawerContainer.writeAction(() -> {
+                        drawerContainer.setSlot(fSlot, fSlotItem.withQuantity(fNewQty));
+                        return null;
+                    });
+                    return true;
+                }
+            }
+            return false;
+        }
 
         for (int slot = 0; slot < sourceContainer.getCapacity(); slot++) {
 

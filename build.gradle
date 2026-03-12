@@ -74,6 +74,9 @@ dependencies {
 
     // ArcIO optional integration (compile-only; not bundled; absent at runtime when ArcIO mod is not installed)
     implementation "curse.maven:arcio-1473915:7692946"
+
+    // Simple Drawers optional integration (compile-only; absent at runtime when Simple Drawers is not installed)
+    implementation "curse.maven:simple-drawer-1456203:7743210"
 }
 
 // Updates the manifest.json file with the latest properties defined in the
