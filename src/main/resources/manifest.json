@@ -17,7 +17,7 @@
         
     },
     "UpdateChecker": {
-    "Curseforge": "1432575"
+        "Curseforge": "1432575"
     },
     "DisabledByDefault": false,
     "Main": "org.Ev0Mods.plugin.Ev0Lib",
