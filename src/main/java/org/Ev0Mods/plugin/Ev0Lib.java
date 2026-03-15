@@ -8,6 +8,7 @@ import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.world.meta.BlockStateRegistry;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import org.Ev0Mods.plugin.api.Ev0Config;
+import org.Ev0Mods.plugin.api.Ev0Log;
 import org.Ev0Mods.plugin.api.block.state.HopperProcessor;
 import org.Ev0Mods.plugin.api.codec.ItemHandler;
 import org.Ev0Mods.plugin.api.component.FluidComponent;
@@ -31,18 +32,18 @@ public class Ev0Lib extends JavaPlugin {
 
     public Ev0Lib(@Nonnull JavaPluginInit init) {
         super(init);
-        LOGGER.atInfo().log("Hello from " + this.getName() + " version " + this.getManifest().getVersion().toString());
+        Ev0Log.info(LOGGER, "Hello from " + this.getName() + " version " + this.getManifest().getVersion().toString());
     }
 
     @Override
     protected void setup() {
-        LOGGER.atInfo().log("Setting up plugin " + this.getName());
+        Ev0Log.info(LOGGER, "Setting up plugin " + this.getName());
         
         // Initialize config system
         String configDir = this.getDataDirectory().toAbsolutePath().toString();
         Ev0Config.initialize(configDir);
-        LOGGER.atInfo().log("Config initialized with tierMultiplier=" + Ev0Config.getTierMultiplier() + 
-                           ", fluidTransferEnabled=" + Ev0Config.isFluidTransferEnabled());
+        Ev0Log.info(LOGGER, "Config initialized with tierMultiplier=" + Ev0Config.getTierMultiplier() + 
+                   ", fluidTransferEnabled=" + Ev0Config.isFluidTransferEnabled());
         
         final var itemOutputCodec = this.getCodecRegistry(ItemHandler.CODEC);
         this.getChunkStoreRegistry().registerSystem(new LiquidPlacingSystem());
@@ -60,11 +61,11 @@ public class Ev0Lib extends JavaPlugin {
             Class.forName("org.Ev0Mods.plugin.api.block.state.HopperArcioRegistration")
                     .getMethod("register")
                     .invoke(null);
-            LOGGER.atInfo().log("[Ev0Lib] Registered ArcIO mechanism: Hopper");
+            Ev0Log.info(LOGGER, "[Ev0Lib] Registered ArcIO mechanism: Hopper");
         } catch (ClassNotFoundException ignored) {
-            LOGGER.atInfo().log("[Ev0Lib] ArcIO not found - skipping mechanism registration");
+            Ev0Log.info(LOGGER, "[Ev0Lib] ArcIO not found - skipping mechanism registration");
         } catch (Exception e) {
-            LOGGER.atWarning().log("[Ev0Lib] Failed to register ArcIO mechanism: " + e.getMessage());
+            Ev0Log.warn(LOGGER, "[Ev0Lib] Failed to register ArcIO mechanism: " + e.getMessage());
         }
     }
     public static String idPascal(String id) {
