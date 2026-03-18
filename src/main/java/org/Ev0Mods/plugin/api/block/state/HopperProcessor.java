@@ -20,6 +20,7 @@ import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.spatial.SpatialResource;
 import com.hypixel.hytale.logger.HytaleLogger;
+import org.Ev0Mods.plugin.api.Ev0Log;
 import com.hypixel.hytale.math.shape.Box;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.math.util.HashUtil;
@@ -111,6 +112,8 @@ import javax.annotation.Nullable;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.lang.reflect.Method;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -126,6 +129,12 @@ import static org.bouncycastle.asn1.x500.style.BCStyle.T;
 @SuppressWarnings("removal")
 
 public class HopperProcessor extends ItemContainerState implements TickableBlockState, ItemContainerBlockState {
+    // Performance tuning: toggle debug logging for hopper internals
+    private static final boolean PERF_DEBUG = false;
+
+    private static void perfInfo(String msg) {
+        if (PERF_DEBUG) Ev0Log.info(HytaleLogger.getLogger(), msg);
+    }
     public int fluid_id = 0;
     public Rangef duration = new Rangef(0, 10);
     public float tier;
@@ -176,6 +185,10 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
     // Snapshotted once per tick so all visual-spawn calls share the same stable player list,
     // avoiding the thread-local spatial list being cleared mid-tick by throwItem/addEntity internals.
     private List<Ref<EntityStore>> nearbyBuffer = new ArrayList<>();
+    private static final ConcurrentHashMap<Class<?>, Method> ITEM_KEY_METHOD_CACHE = new ConcurrentHashMap<>();
+    // Cached answer to "are any players nearby?" updated every 60 ticks to avoid
+    // running the player spatial query every tick for every hopper.
+    private boolean playersNearbyCached = false;
     // Fluid blocks to remove on the next tick (deferred to avoid mutating the archetype chunk mid-tick)
     private final List<long[]> pendingFluidRemovals = new ArrayList<>();
 
@@ -204,66 +217,74 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
     private String arcioMode = "IgnoreSignal";
 
     // Runtime filter state for this hopper (not persisted yet)
-    private final List<String> whitelist = new ArrayList<>();
-    private final List<String> blacklist = new ArrayList<>();
-    private String filterMode = "Off";
+    private final List<String> whitelist = Collections.synchronizedList(new ArrayList<>());
+    private final List<String> blacklist = Collections.synchronizedList(new ArrayList<>());
+    private volatile String filterMode = "Off";
     // Temporary per-player typed buffer (so TextField changes can be captured even if Add button doesn't send value)
-    private final Map<com.hypixel.hytale.server.core.universe.PlayerRef, String> typedBuffer = new HashMap<>();
+    private final Map<com.hypixel.hytale.server.core.universe.PlayerRef, String> typedBuffer = new ConcurrentHashMap<>();
 
-    public synchronized List<String> getWhitelist() { return new ArrayList<>(whitelist); }
-    public synchronized List<String> getBlacklist() { return new ArrayList<>(blacklist); }
-    public synchronized String getFilterMode() { return filterMode; }
-    public synchronized void addToWhitelist(String id) { if (id != null) whitelist.add(id); }
-    public synchronized void addToBlacklist(String id) { if (id != null) blacklist.add(id); }
-    public synchronized void setFilterMode(String mode) { if (mode != null) filterMode = mode; }
-    public synchronized String removeLastFromWhitelist() {
-        if (whitelist.isEmpty()) return null;
-        return whitelist.remove(whitelist.size() - 1);
+    public List<String> getWhitelist() { synchronized (whitelist) { return new ArrayList<>(whitelist); } }
+    public List<String> getBlacklist() { synchronized (blacklist) { return new ArrayList<>(blacklist); } }
+    public String getFilterMode() { return filterMode; }
+    public void addToWhitelist(String id) { if (id != null) whitelist.add(id); }
+    public void addToBlacklist(String id) { if (id != null) blacklist.add(id); }
+    public void setFilterMode(String mode) { if (mode != null) filterMode = mode; }
+    public String removeLastFromWhitelist() {
+        synchronized (whitelist) {
+            if (whitelist.isEmpty()) return null;
+            return whitelist.remove(whitelist.size() - 1);
+        }
     }
-    public synchronized String removeLastFromBlacklist() {
-        if (blacklist.isEmpty()) return null;
-        return blacklist.remove(blacklist.size() - 1);
+    public String removeLastFromBlacklist() {
+        synchronized (blacklist) {
+            if (blacklist.isEmpty()) return null;
+            return blacklist.remove(blacklist.size() - 1);
+        }
     }
-    public synchronized void clearWhitelist() { whitelist.clear(); }
-    public synchronized void clearBlacklist() { blacklist.clear(); }
+    public void clearWhitelist() { whitelist.clear(); }
+    public void clearBlacklist() { blacklist.clear(); }
 
-    public synchronized String getArcioMode() { return arcioMode; }
-    public synchronized void setArcioMode(String mode) { if (mode != null) arcioMode = mode; }
+    public String getArcioMode() { return arcioMode; }
+    public void setArcioMode(String mode) { if (mode != null) arcioMode = mode; }
 
-    public synchronized void setTypedBuffer(com.hypixel.hytale.server.core.universe.PlayerRef p, String v) {
+    public void setTypedBuffer(com.hypixel.hytale.server.core.universe.PlayerRef p, String v) {
         if (p == null) return;
         if (v == null) typedBuffer.remove(p);
         else typedBuffer.put(p, v);
     }
 
-    public synchronized String getTypedBuffer(com.hypixel.hytale.server.core.universe.PlayerRef p) {
+    public String getTypedBuffer(com.hypixel.hytale.server.core.universe.PlayerRef p) {
         if (p == null) return null;
         return typedBuffer.get(p);
     }
 
     // Returns true when the given block key is allowed to be imported according to filter state
-    private synchronized boolean isItemAllowedByFilter(String blockKey) {
+    private boolean isItemAllowedByFilter(String blockKey) {
         // If mode is not set or Off, allow everything
         if (filterMode == null || filterMode.equalsIgnoreCase("Off")) return true;
 
         // Whitelist mode: if whitelist is empty/null, block everything. Only allow exact matches.
         if (filterMode.equalsIgnoreCase("Whitelist")) {
-            if (whitelist == null || whitelist.isEmpty()) return false;
-            if (blockKey == null) return false;
-            for (String s : whitelist) {
-                if (s != null && s.equalsIgnoreCase(blockKey)) return true;
+            synchronized (whitelist) {
+                if (whitelist == null || whitelist.isEmpty()) return false;
+                if (blockKey == null) return false;
+                for (String s : whitelist) {
+                    if (s != null && s.equalsIgnoreCase(blockKey)) return true;
+                }
+                return false;
             }
-            return false;
         }
 
         // Blacklist mode: if blacklist is empty/null, allow everything. Block only exact matches.
         if (filterMode.equalsIgnoreCase("Blacklist")) {
-            if (blacklist == null || blacklist.isEmpty()) return true;
-            if (blockKey == null) return true;
-            for (String s : blacklist) {
-                if (s != null && s.equalsIgnoreCase(blockKey)) return false;
+            synchronized (blacklist) {
+                if (blacklist == null || blacklist.isEmpty()) return true;
+                if (blockKey == null) return true;
+                for (String s : blacklist) {
+                    if (s != null && s.equalsIgnoreCase(blockKey)) return false;
+                }
+                return true;
             }
-            return true;
         }
 
         // Default allow
@@ -271,18 +292,30 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
     }
 
     // Try to resolve a reliable id/key string from an ItemStack using known accessors, fallback to toString()
-    public synchronized String resolveItemStackKey(ItemStack stack) {
+    public String resolveItemStackKey(ItemStack stack) {
         if (stack == null) return null;
         try {
             Object probe = null;
             try { probe = stack.getBlockKey(); } catch (Throwable ignored) {}
             if (probe == null) {
-                String[] candidates = new String[]{"getItemId","getItemKey","getId","getKey","getName","getBlockKey"};
-                for (String m : candidates) {
+                Class<?> cls = stack.getClass();
+                Method m = ITEM_KEY_METHOD_CACHE.get(cls);
+                if (m == null && !ITEM_KEY_METHOD_CACHE.containsKey(cls)) {
+                    Method found = null;
+                    String[] candidates = new String[]{"getItemId","getItemKey","getId","getKey","getName","getBlockKey"};
+                    for (String name : candidates) {
+                        try {
+                            found = cls.getMethod(name);
+                            if (found != null) break;
+                        } catch (Throwable ignored) {}
+                    }
+                    ITEM_KEY_METHOD_CACHE.put(cls, found); // cache even null to avoid repeated lookups
+                    m = found;
+                }
+                if (m != null) {
                     try {
-                        java.lang.reflect.Method mm = stack.getClass().getMethod(m);
-                        Object v = mm.invoke(stack);
-                        if (v != null) { probe = v; break; }
+                        Object v = m.invoke(stack);
+                        if (v != null) probe = v;
                     } catch (Throwable ignored) {}
                 }
             }
@@ -432,23 +465,51 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
         final Vector3i pos = this.getBlockPosition();
 
-        // Snapshot nearby players once per tick into an instance field so every spawnVisual call
-        // within this tick reads from a stable ArrayList rather than re-querying the shared
-        // thread-local ObjectList (which getThreadLocalReferenceList() clears on every call).
-        nearbyBuffer = getAllEntitiesInBox(this, pos, data.height, (ComponentAccessor<EntityStore>) entities, data.players, data.entities, data.items);
-
-        // Tick-based transfer control: increment counter and only act every 30 ticks.
+        // Defer spatial queries until we know visuals may be spawned. This avoids
+        // running an expensive spatial collect on every tick for every hopper.
+        nearbyBuffer.clear();
+        // Tick-based transfer control: increment counter and only act every 90 ticks (cycle length 180).
+        // We multiply the previous 60-tick cycle by 3 to reduce heavy calls frequency.
         tickCounter++;
-        int phase = tickCounter % 60; // 0..59
-        boolean doExport = phase == 0;   // export on ticks 0,60,120...
-        boolean doImport = phase == 30;  // import on ticks 30,90,150...
+        int phase = tickCounter % 180; // 0..179
+        boolean doExport = phase == 0;   // export on ticks 0,180,360...
+        boolean doImport = phase == 90;  // import on ticks 90,270,450...
+
+        // Update cached nearby-player state once every 180 ticks to reduce query cost.
+        if (tickCounter % 180 == 0) {
+            try {
+                final ObjectList<Ref<EntityStore>> rawPlayers = SpatialResource.getThreadLocalReferenceList();
+                final Vector3d center = new Vector3d(pos.x, pos.y, pos.z);
+                ((ComponentAccessor<EntityStore>) entities)
+                        .getResource(EntityModule.get().getPlayerSpatialResourceType())
+                        .getSpatialStructure()
+                        .collectCylinder(center, 4, Math.max(1.0f, data.height), rawPlayers);
+                playersNearbyCached = !rawPlayers.isEmpty();
+                rawPlayers.clear();
+            } catch (Exception ignored) {}
+        }
 
 
         if (doExport) {
+            // Only compute nearby entities if we have items to export *and* players are nearby
+            ItemStack have = this.getItemContainer().getItemStack((short) 0);
+            if (have != null && playersNearbyCached) {
+                nearbyBuffer = getAllEntitiesInBox(this, pos, data.height, (ComponentAccessor<EntityStore>) entities, data.players, data.entities, data.items);
+            } else {
+                nearbyBuffer.clear();
+            }
             runExportPhase(pos, entities);
         }
 
         if (doImport) {
+            // Only compute nearby entities if hopper has room to import items AND players are nearby
+            ItemStack have2 = this.getItemContainer().getItemStack((short) 0);
+            boolean hopperHasSpace = (have2 == null) || (have2.getQuantity() < 100);
+            if (hopperHasSpace && playersNearbyCached) {
+                nearbyBuffer = getAllEntitiesInBox(this, pos, data.height, (ComponentAccessor<EntityStore>) entities, data.players, data.entities, data.items);
+            } else {
+                nearbyBuffer.clear();
+            }
             // Import phase: try to pull from configured import faces AND collect fluids from world
             for (AdjacentSide side : this.data.importFaces) {
                 final Vector3i importPos = new Vector3i(pos.x, pos.y, pos.z)
@@ -484,18 +545,18 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                     }
                 }
 
-                HytaleLogger.getLogger().atInfo().log("[Hopper][Import] side=" + side + " importPos=" + importPos + " state=" + (state == null ? "null" : state.getClass().getSimpleName()) + " hasContainer=" + hasContainer);
+                perfInfo("[Hopper][Import] side=" + side + " importPos=" + importPos + " state=" + (state == null ? "null" : state.getClass().getSimpleName()) + " hasContainer=" + hasContainer);
 
                 if (tryImportFromContainer(chunk, importPos, entities, side)) {
-                    HytaleLogger.getLogger().atInfo().log("[Hopper][Import] tryImportFromContainer SUCCESS side=" + side);
+                    perfInfo("[Hopper][Import] tryImportFromContainer SUCCESS side=" + side);
                     break; // one successful import stops further faces this phase
                 }
 
-                HytaleLogger.getLogger().atInfo().log("[Hopper][Import] tryImportFromContainer failed, hasContainer=" + hasContainer + " -> will tryPickup=" + !hasContainer);
+                perfInfo("[Hopper][Import] tryImportFromContainer failed, hasContainer=" + hasContainer + " -> will tryPickup=" + !hasContainer);
                 // No matching block state at the import face — behave like a hopper:
                 // pick up item entities sitting in the 1x1x1 space where the input block would be.
                 if (!hasContainer && tryPickupItemEntities(importPos, entities)) {
-                    HytaleLogger.getLogger().atInfo().log("[Hopper][Import] tryPickupItemEntities SUCCESS at " + importPos);
+                    perfInfo("[Hopper][Import] tryPickupItemEntities SUCCESS at " + importPos);
                     runExportPhase(pos, entities);
                     break;
                 }
@@ -555,96 +616,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
         boolean isProcessingBench = state instanceof ProcessingBenchState;
         ProcessingBenchState bench = isProcessingBench ? (ProcessingBenchState) state : null;
 
-        // Helper to spawn visual thrown items: compute velocity from side and always spawn an entity
-        Function<ItemStack, Void> spawnVisual = (safeStack) -> {
-                Vector3i rel = WorldHelper.rotate(side, this.getRotationIndex()).relativePosition;
-                // compute spawn origin and velocity depending on whether we're exporting or importing
-                Vector3i hopperBlock = this.getBlockPosition();
-                Vector3d hopperCenter = new Vector3d(hopperBlock.x + 0.5, hopperBlock.y + 0.5, hopperBlock.z + 0.5);
-                Vector3d sourceCenter = new Vector3d(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
-                // spawn at the source when importing, at hopper when exporting
-                Vector3d spawnPos = exportPhase ? hopperCenter : sourceCenter;
-                // velocity: export sends items away from hopper, import should move toward hopper (inverse direction)
-                // Invert both X and Z components (multiply by -1) to correct direction mapping
-                Vector3d velocity = exportPhase ? new Vector3d(-rel.x * 0.35, 0.25, -rel.z * 0.35) : new Vector3d(rel.x * 0.35, 0.25, rel.z * 0.35);
-
-                if (safeStack == null || safeStack.isEmpty()) return null;
-            //HytaleLogger.getLogger().atInfo().log("spawnVisual: spawnPos=" + spawnPos + " item=" + safeStack);
-            // Prefer helper behavior when we have nearby targets, but only on export
-            if (exportPhase) {
-                List<Ref<EntityStore>> nearby = nearbyBuffer;
-                if (!nearby.isEmpty()) {
-                    boolean anySpawned = false;
-                    for (Ref<EntityStore> targetRef : nearby) {
-                        // spawn helper visuals from the hopper center so visuals appear inside the block
-                        String oppSide;
-                        switch (side.toString()) {
-                            case "East" -> oppSide = "West";
-                            case "West" -> oppSide = "East";
-                            case "North" -> oppSide = "South";
-                            case "South" -> oppSide = "North";
-                            case "Up" -> oppSide = "Down";
-                            case "Down" -> oppSide = "Up";
-                            default -> oppSide = side.toString();
-                        }
-                        Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), oppSide, new Vector3d(hopperBlock.x, hopperBlock.y, hopperBlock.z), targetRef, (ComponentAccessor<EntityStore>) entities, safeStack, Vector3d.ZERO, 0f);
-                        //HytaleLogger.getLogger().atInfo().log("spawnVisual: helper returned=" + rs + " target=" + targetRef + " oppSide=" + oppSide + " safeStack=" + safeStack);
-                        if (rs != null) {
-                            l.add(rs);
-                            try {
-                                visualMap.put(rs, safeStack);
-                                Instant now = this.es != null ? this.es.getResource(WorldTimeResource.getResourceType()).getGameTime() : Instant.now();
-                                visualSpawnTimes.put(rs, now);
-                            } catch (Exception ignored) {}
-                            anySpawned = true;
-                        }
-                    }
-                    // only skip the fallback spawn if at least one helper spawn succeeded
-                    if (anySpawned) return null;
-                }
-            }
-
-            // Only spawn visual if there are nearby targets in range
-            if (nearbyBuffer.isEmpty()) {
-                return null; // Skip visual spawn entirely when no players/entities are nearby
-            }
-
-            // Fallback: direct spawn if no targets
-            Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop((ComponentAccessor<EntityStore>) entities, safeStack, new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z), Vector3f.ZERO, 0, -1, 0);
-            if (itemEntityHolder == null) {
-                //HytaleLogger.getLogger().atInfo().log("spawnVisual: generateItemDrop returned null for " + safeStack + " at " + spawnPos);
-                return null;
-            }
-
-            ItemComponent itemComponent = (ItemComponent) itemEntityHolder.getComponent(ItemComponent.getComponentType());
-            if (itemComponent != null) {
-                itemComponent.setPickupDelay(100000000);
-                itemComponent.setRemovedByPlayerPickup(false);
-                itemComponent.computeDynamicLight();
-            }
-
-            try {
-                ((PhysicsValues) itemEntityHolder.ensureAndGetComponent(PhysicsValues.getComponentType())).replaceValues(new PhysicsValues(0,0,true));
-                ((Velocity) itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(velocity.x, velocity.y, velocity.z);
-            } catch (Exception ignored) {}
-            try { itemEntityHolder.tryRemoveComponent(BoundingBox.getComponentType()); } catch (Exception ignored) {}
-            try { itemEntityHolder.ensureAndGetComponent(Intangible.getComponentType()); } catch (Exception ignored) {}
-
-            Ref<EntityStore> spawned = entities.addEntity(itemEntityHolder, AddReason.SPAWN);
-            //HytaleLogger.getLogger().atInfo().log("spawnVisual: addEntity returned=" + spawned + " for item=" + safeStack);
-            if (spawned != null) {
-                TransformComponent tc = entities.getComponent(spawned, TransformComponent.getComponentType());
-                if (tc != null) tc.setPosition(new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z));
-                l.add(spawned);
-                try {
-                    visualMap.put(spawned, safeStack);
-                    Instant now = this.es != null ? this.es.getResource(WorldTimeResource.getResourceType()).getGameTime() : Instant.now();
-                    visualSpawnTimes.put(spawned, now);
-                } catch (Exception ignored) {}
-            }
-
-            return null;
-        };
+        // Visual spawn moved to helper method to avoid lambda/metafactory churn
 
         // ProcessingBench handling: respect phase
         if (isProcessingBench) {
@@ -655,8 +627,10 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                 for (int slot = 0; slot < output.getCapacity(); slot++) {
                     ItemStack stack = output.getItemStack((short) slot);
                     if (stack == null) continue;
-                    // Apply filter: skip items not allowed by filter
-                    String probeKeyPb = resolveItemStackKey(stack);
+                    // Apply filter: skip items not allowed by filter (fast path via getBlockKey)
+                    String probeKeyPb = null;
+                    try { probeKeyPb = stack.getBlockKey(); } catch (Throwable ignored) {}
+                    if (probeKeyPb == null) probeKeyPb = resolveItemStackKey(stack);
                     if (!isItemAllowedByFilter(probeKeyPb)) {
                         continue;
                     }
@@ -681,7 +655,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                             ItemStackSlotTransaction t = input.addItemStackToSlot((short) slot, safeStack);
                             if (t.succeeded()) {
                                 //HytaleLogger.getLogger().atInfo().log("spawnVisual: caller=ProcessingBenchExport side=" + side + " pos=" + pos + " safeStack=" + safeStack);
-                                spawnVisual.apply(safeStack);
+                                spawnVisualFor(safeStack, exportPhase, pos, side, entities);
                                 this.getItemContainer().removeItemStackFromSlot((short) 0, transferAmount);
                                 return true;
                             }
@@ -707,7 +681,9 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                     ItemStack slotItem = drawerContainer.getSlotItem(slot);
                     int slotQty = drawerContainer.getSlotQuantity(slot);
                     if (slotItem == null || slotQty <= 0) continue;
-                    String probeKey = resolveItemStackKey(slotItem);
+                    String probeKey = null;
+                    try { probeKey = slotItem.getBlockKey(); } catch (Throwable ignored) {}
+                    if (probeKey == null) probeKey = resolveItemStackKey(slotItem);
                     if (!isItemAllowedByFilter(probeKey)) continue;
                     int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), slotQty);
                     if (transferAmount <= 0) continue;
@@ -776,7 +752,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                 drawerContainer.setSlot(fSlot, fHave.withQuantity(fNewQty));
                                 return null;
                             });
-                            spawnVisual.apply(have.withQuantity(fActual));
+                            spawnVisualFor(have.withQuantity(fActual), exportPhase, pos, side, entities);
                             this.getItemContainer().removeItemStackFromSlot((short) 0, fActual);
                             return true;
                         }
@@ -791,8 +767,10 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             for (int slot = 0; slot < container.getCapacity(); slot++) {
                 ItemStack stack = container.getItemStack((short) slot);
                 if (stack == null) continue;
-                // Apply filter: skip items not allowed by filter
-                String probeKey = resolveItemStackKey(stack);
+                // Apply filter: skip items not allowed by filter (fast path)
+                String probeKey = null;
+                try { probeKey = stack.getBlockKey(); } catch (Throwable ignored) {}
+                if (probeKey == null) probeKey = resolveItemStackKey(stack);
                 if (!isItemAllowedByFilter(probeKey)) {
                     continue;
                 }
@@ -817,7 +795,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                 ItemStackSlotTransaction t = container.addItemStackToSlot((short) slot, safeStack);
                 if (t.succeeded()) {
                     //HytaleLogger.getLogger().atInfo().log("spawnVisual: caller=NormalExport side=" + side + " pos=" + pos + " safeStack=" + safeStack);
-                    spawnVisual.apply(safeStack);
+                    spawnVisualFor(safeStack, exportPhase, pos, side, entities);
                     this.getItemContainer().removeItemStackFromSlot((short) 0, transferAmount);
                     return true;
                 }
@@ -832,6 +810,78 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
      * Handles both export (to inputs) and import (from outputs) in one function.
      */
 
+    // Extracted visual spawn logic to a method to avoid per-call lambda allocation
+    private void spawnVisualFor(ItemStack safeStack, boolean exportPhase, Vector3i pos, AdjacentSide side, Store<EntityStore> entities) {
+        if (safeStack == null || safeStack.isEmpty()) return;
+        Vector3i rel = WorldHelper.rotate(side, this.getRotationIndex()).relativePosition;
+        Vector3i hopperBlock = this.getBlockPosition();
+        Vector3d hopperCenter = new Vector3d(hopperBlock.x + 0.5, hopperBlock.y + 0.5, hopperBlock.z + 0.5);
+        Vector3d sourceCenter = new Vector3d(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
+        Vector3d spawnPos = exportPhase ? hopperCenter : sourceCenter;
+        Vector3d velocity = exportPhase ? new Vector3d(-rel.x * 0.35, 0.25, -rel.z * 0.35) : new Vector3d(rel.x * 0.35, 0.25, rel.z * 0.35);
+
+        if (exportPhase) {
+            List<Ref<EntityStore>> nearby = nearbyBuffer;
+            if (!nearby.isEmpty()) {
+                boolean anySpawned = false;
+                for (Ref<EntityStore> targetRef : nearby) {
+                    String oppSide;
+                    switch (side.toString()) {
+                        case "East" -> oppSide = "West";
+                        case "West" -> oppSide = "East";
+                        case "North" -> oppSide = "South";
+                        case "South" -> oppSide = "North";
+                        case "Up" -> oppSide = "Down";
+                        case "Down" -> oppSide = "Up";
+                        default -> oppSide = side.toString();
+                    }
+                    Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), oppSide, new Vector3d(hopperBlock.x, hopperBlock.y, hopperBlock.z), targetRef, (ComponentAccessor<EntityStore>) entities, safeStack, Vector3d.ZERO, 0f);
+                    if (rs != null) {
+                        l.add(rs);
+                        try {
+                            visualMap.put(rs, safeStack);
+                            Instant now = entities != null ? entities.getResource(WorldTimeResource.getResourceType()).getGameTime() : Instant.now();
+                            visualSpawnTimes.put(rs, now);
+                        } catch (Exception ignored) {}
+                        anySpawned = true;
+                    }
+                }
+                if (anySpawned) return;
+            }
+        }
+
+        if (nearbyBuffer.isEmpty()) return;
+
+        Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop((ComponentAccessor<EntityStore>) entities, safeStack, new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z), Vector3f.ZERO, 0, -1, 0);
+        if (itemEntityHolder == null) return;
+
+        ItemComponent itemComponent = (ItemComponent) itemEntityHolder.getComponent(ItemComponent.getComponentType());
+        if (itemComponent != null) {
+            itemComponent.setPickupDelay(100000000);
+            itemComponent.setRemovedByPlayerPickup(false);
+            itemComponent.computeDynamicLight();
+        }
+
+        try {
+            ((PhysicsValues) itemEntityHolder.ensureAndGetComponent(PhysicsValues.getComponentType())).replaceValues(new PhysicsValues(0,0,true));
+            ((Velocity) itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(velocity.x, velocity.y, velocity.z);
+        } catch (Exception ignored) {}
+        try { itemEntityHolder.tryRemoveComponent(BoundingBox.getComponentType()); } catch (Exception ignored) {}
+        try { itemEntityHolder.ensureAndGetComponent(Intangible.getComponentType()); } catch (Exception ignored) {}
+
+        Ref<EntityStore> spawned = entities.addEntity(itemEntityHolder, AddReason.SPAWN);
+        if (spawned != null) {
+            TransformComponent tc = entities.getComponent(spawned, TransformComponent.getComponentType());
+            if (tc != null) tc.setPosition(new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z));
+            l.add(spawned);
+            try {
+                visualMap.put(spawned, safeStack);
+                Instant now = entities != null ? entities.getResource(WorldTimeResource.getResourceType()).getGameTime() : Instant.now();
+                visualSpawnTimes.put(spawned, now);
+            } catch (Exception ignored) {}
+        }
+    }
+
 
 
 /* ============================================================
@@ -840,6 +890,10 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
     /** Runs the full export cycle (same logic as the doExport tick phase). */
     private void runExportPhase(Vector3i pos, Store<EntityStore> entities) {
+        // Fast-path: if hopper is empty, skip work entirely (most common case).
+        ItemStack currentItemFast = this.getItemContainer().getItemStack((short) 0);
+        if (currentItemFast == null) return;
+
         for (AdjacentSide side : this.data.exportFaces) {
             final Vector3i exportPos = new Vector3i(pos.x, pos.y, pos.z)
                     .add(WorldHelper.rotate(side, this.getRotationIndex()).relativePosition);
@@ -1050,6 +1104,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
     }
 
 
+
 /* ============================================================
    IMPORT
    ============================================================ */
@@ -1084,6 +1139,9 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                                            Vector3i pos,
                                            Store<EntityStore> entities,
                                            AdjacentSide side) {
+        // Fast path: if this hopper is already full, skip scanning containers entirely.
+        ItemStack destStack = this.getItemContainer().getItemStack((short) 0);
+        if (destStack != null && destStack.getQuantity() >= 100) return false;
 
         Object state = chunk.getState(pos.x, pos.y, pos.z);
 
@@ -1092,31 +1150,23 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
        --------------------------------- */
         if (state instanceof ProcessingBenchState bench) {
 
-            // Only import from output container (2)
-            ItemContainer output =
-                    bench.getItemContainer().getContainer(2);
+                // Only import from output container (2)
+                ItemContainer output = bench.getItemContainer().getContainer(2);
 
-            for (int slot = 0; slot < output.getCapacity(); slot++) {
-
+                int outCap = output.getCapacity();
+                for (int slot = 0; slot < outCap; slot++) {
                 ItemStack stack = output.getItemStack((short) slot);
                 if (stack == null) continue;
-                // Apply filter: skip items not allowed by filter
-                if (!isItemAllowedByFilter(stack.getBlockKey())) {
-                    continue;
-                }
+                // Apply filter: prefer fast path via getBlockKey() then fallback to resolve
+                String blockKey = null;
+                try { blockKey = stack.getBlockKey(); } catch (Throwable ignored) {}
+                if (blockKey == null) blockKey = resolveItemStackKey(stack);
+                if (!isItemAllowedByFilter(blockKey)) continue;
 
-                int transferAmount =
-                        (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
+                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
                 if (transferAmount <= 0) continue;
 
-                ItemStack safeStack =
-                        stack.withQuantity(transferAmount);
-
-                ItemStackSlotTransaction t =
-                        this.getItemContainer().addItemStackToSlot(
-                                (short) 0,
-                                safeStack
-                        );
+                ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, stack.withQuantity(transferAmount));
 
                 if (t.succeeded()) {
 
@@ -1141,10 +1191,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                         }
                     }
 
-                    output.removeItemStackFromSlot(
-                            (short) slot,
-                            transferAmount
-                    );
+                        output.removeItemStackFromSlot((short) slot, transferAmount);
 
                     return true; // one batch per tick
                 }
@@ -1156,21 +1203,19 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
         // Special-case: importing from another HopperProcessor
         if (state instanceof HopperProcessor otherHopper) {
             // Let addItemStackToSlot decide whether the hopper slot can accept — no hardcoded cap.
-            for (int n = 0; n < otherHopper.getItemContainer().getCapacity(); n++) {
+            int otherCap = otherHopper.getItemContainer().getCapacity();
+            for (int n = 0; n < otherCap; n++) {
                 ItemStack otherStack = otherHopper.getItemContainer().getItemStack((short) n);
                 if (otherStack == null) continue;
 
-                // Apply filter: skip items not allowed
-                String otherKey = resolveItemStackKey(otherStack);
-                if (!isItemAllowedByFilter(otherKey)) {
-                    continue;
-                }
+                String otherKey = null;
+                try { otherKey = otherStack.getBlockKey(); } catch (Throwable ignored) {}
+                if (otherKey == null) otherKey = resolveItemStackKey(otherStack);
+                if (!isItemAllowedByFilter(otherKey)) continue;
 
-                // Calculate transfer amount based on tier multiplier; container decides actual capacity
                 int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), otherStack.getQuantity());
                 if (transferAmount <= 0) continue;
 
-                // Try to take items from the other hopper into this hopper
                 ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, otherStack.withQuantity(transferAmount));
                 if (t.succeeded()) {
                     // Spawn hopper-to-hopper visual using the tick-buffered player list.
@@ -1220,7 +1265,9 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                 ItemStack slotItem = drawerContainer.getSlotItem(slot);
                 int slotQty = drawerContainer.getSlotQuantity(slot);
                 if (slotItem == null || slotQty <= 0) continue;
-                String probeKey2 = resolveItemStackKey(slotItem);
+                String probeKey2 = null;
+                try { probeKey2 = slotItem.getBlockKey(); } catch (Throwable ignored) {}
+                if (probeKey2 == null) probeKey2 = resolveItemStackKey(slotItem);
                 if (!isItemAllowedByFilter(probeKey2)) continue;
                 int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), slotQty);
                 if (transferAmount <= 0) continue;
@@ -1262,8 +1309,10 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                 sourceContainer.getItemStack((short) slot);
             if (stack == null) continue;
 
-            // Apply filter: skip items not allowed by filter
-            String probeKey2 = resolveItemStackKey(stack);
+            // Apply filter: skip items not allowed by filter (fast path)
+            String probeKey2 = null;
+            try { probeKey2 = stack.getBlockKey(); } catch (Throwable ignored) {}
+            if (probeKey2 == null) probeKey2 = resolveItemStackKey(stack);
             if (!isItemAllowedByFilter(probeKey2)) {
                 continue;
             }
@@ -1329,20 +1378,18 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
      * when there is no input block present at that face.
      */
     private boolean tryPickupItemEntities(Vector3i importPos, Store<EntityStore> entities) {
-        HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] tryPickupItemEntities called at " + importPos);
+        perfInfo("[Hopper][Pickup] tryPickupItemEntities called at " + importPos);
         final ObjectList<Ref<EntityStore>> rawResults = SpatialResource.getThreadLocalReferenceList();
-        // Dropped items are tracked under the item spatial resource (getItemSpatialResourceType),
-        // not the generic entity resource. This matches how Spellbook's ConveyorState locates items.
         final Vector3d boxMin = new Vector3d(importPos.x, importPos.y, importPos.z);
         final Vector3d boxMax = new Vector3d(importPos.x + 1.0, importPos.y + 1.0, importPos.z + 1.0);
-        HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] collectBox min=" + boxMin + " max=" + boxMax);
+        perfInfo("[Hopper][Pickup] collectBox min=" + boxMin + " max=" + boxMax);
         ((ComponentAccessor<EntityStore>) entities)
-                .getResource(EntityModule.get().getItemSpatialResourceType())
-                .getSpatialStructure()
-                .collectBox(boxMin, boxMax, rawResults);
-        HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] collectBox rawResults.size()=" + rawResults.size());
+            .getResource(EntityModule.get().getItemSpatialResourceType())
+            .getSpatialStructure()
+            .collectBox(boxMin, boxMax, rawResults);
+        perfInfo("[Hopper][Pickup] collectBox rawResults.size()=" + rawResults.size());
         if (rawResults.isEmpty()) {
-            HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] no items found in box, returning false");
+            perfInfo("[Hopper][Pickup] no items found in box, returning false");
             return false;
         }
 
@@ -1351,51 +1398,53 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
 
         int hopperQty = this.getItemContainer().getItemStack((short) 0) == null ? 0
                 : this.getItemContainer().getItemStack((short) 0).getQuantity();
-        HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] hopperQty=" + hopperQty + " itemRefs.size()=" + itemRefs.size());
+        perfInfo("[Hopper][Pickup] hopperQty=" + hopperQty + " itemRefs.size()=" + itemRefs.size());
         if (hopperQty >= 100) {
-            HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] hopper full (qty=" + hopperQty + "), returning false");
+            perfInfo("[Hopper][Pickup] hopper full (qty=" + hopperQty + "), returning false");
             return false;
         }
 
         for (Ref<EntityStore> ref : itemRefs) {
             if (ref == null || !ref.isValid()) {
-                HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] ref null or invalid, skipping");
+                perfInfo("[Hopper][Pickup] ref null or invalid, skipping");
                 continue;
             }
             // Skip our own in-transit visual entities.
             if (l.contains(ref)) {
-                HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] ref=" + ref + " is own visual, skipping");
+                perfInfo("[Hopper][Pickup] ref=" + ref + " is own visual, skipping");
                 continue;
             }
             // Note: NOT skipping Intangible entities — real dropped items may carry that component.
             if (entities.getComponent(ref, Intangible.getComponentType()) != null) {
-                HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] ref=" + ref + " has Intangible (logging only, not skipping)");
+                perfInfo("[Hopper][Pickup] ref=" + ref + " has Intangible (logging only, not skipping)");
             }
 
             ItemComponent ic = (ItemComponent) entities.getComponent(ref, ItemComponent.getComponentType());
             if (ic == null) {
-                HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] ref=" + ref + " has no ItemComponent, skipping");
+                perfInfo("[Hopper][Pickup] ref=" + ref + " has no ItemComponent, skipping");
                 continue;
             }
 
             // Skip items still in their drop delay (not yet collectible).
             if (!ic.canPickUp()) {
-                HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] ref=" + ref + " canPickUp()=false (drop delay active), skipping");
+                perfInfo("[Hopper][Pickup] ref=" + ref + " canPickUp()=false (drop delay active), skipping");
                 continue;
             }
 
             ItemStack stack = ic.getItemStack();
             if (stack == null || stack.isEmpty()) {
-                HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] ref=" + ref + " stack is null or empty, skipping");
+                perfInfo("[Hopper][Pickup] ref=" + ref + " stack is null or empty, skipping");
                 continue;
             }
 
-            String itemKey = resolveItemStackKey(stack);
-            HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] ref=" + ref + " itemKey=" + itemKey + " qty=" + stack.getQuantity());
+            String itemKey = null;
+            try { itemKey = stack.getBlockKey(); } catch (Throwable ignored) {}
+            if (itemKey == null) itemKey = resolveItemStackKey(stack);
+            perfInfo("[Hopper][Pickup] ref=" + ref + " itemKey=" + itemKey + " qty=" + stack.getQuantity());
 
             // Apply filter.
             if (!isItemAllowedByFilter(itemKey)) {
-                HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] ref=" + ref + " BLOCKED by filter (mode=" + filterMode + ")");
+                perfInfo("[Hopper][Pickup] ref=" + ref + " BLOCKED by filter (mode=" + filterMode + ")");
                 continue;
             }
 
@@ -1403,19 +1452,19 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                     data.tier * Ev0Config.getTierMultiplier(),
                     Math.min(stack.getQuantity(), 100 - hopperQty)
             );
-            HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] transferAmount=" + transferAmount + " for " + itemKey);
+            perfInfo("[Hopper][Pickup] transferAmount=" + transferAmount + " for " + itemKey);
             if (transferAmount <= 0) {
-                HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] transferAmount<=0, skipping");
+                perfInfo("[Hopper][Pickup] transferAmount<=0, skipping");
                 continue;
             }
 
             ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot(
                     (short) 0, stack.withQuantity(transferAmount));
 
-            HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] addItemStackToSlot succeeded=" + t.succeeded() + " item=" + itemKey + " amount=" + transferAmount);
+            perfInfo("[Hopper][Pickup] addItemStackToSlot succeeded=" + t.succeeded() + " item=" + itemKey + " amount=" + transferAmount);
             if (t.succeeded()) {
                 int remaining = stack.getQuantity() - transferAmount;
-                HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] SUCCESS item=" + itemKey + " transferred=" + transferAmount + " remaining=" + remaining);
+                perfInfo("[Hopper][Pickup] SUCCESS item=" + itemKey + " transferred=" + transferAmount + " remaining=" + remaining);
                 if (remaining <= 0) {
                     entities.removeEntity(ref, RemoveReason.REMOVE);
                 } else {
@@ -1436,7 +1485,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                 return true;
             }
         }
-        HytaleLogger.getLogger().atInfo().log("[Hopper][Pickup] no items collected at " + importPos + ", returning false");
+        perfInfo("[Hopper][Pickup] no items collected at " + importPos + ", returning false");
         return false;
     }
 
@@ -1489,7 +1538,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
             }
             arcioInitialized = true;
         } catch (Exception e) {
-            HytaleLogger.getLogger().atWarning().log("[Hopper] Failed to ensure ArcIO components: " + e.getMessage());
+            Ev0Log.warn(HytaleLogger.getLogger(), "[Hopper] Failed to ensure ArcIO components: " + e.getMessage());
         }
     }
 
@@ -1515,7 +1564,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                 }
             }
         } catch (Exception e) {
-            HytaleLogger.getLogger().atWarning().log("[Hopper] ArcIO signal check failed: " + e.getMessage());
+            Ev0Log.warn(HytaleLogger.getLogger(), "[Hopper] ArcIO signal check failed: " + e.getMessage());
         }
         return hasAdjacentActiveArcioMechanism(world);
     }
@@ -1539,7 +1588,7 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
                 if (mc != null && mc.getStrongestInputSignal(world) > 0) return true;
             }
         } catch (Exception e) {
-            HytaleLogger.getLogger().atWarning().log("[Hopper] ArcIO adjacent check failed: " + e.getMessage());
+            Ev0Log.warn(HytaleLogger.getLogger(), "[Hopper] ArcIO adjacent check failed: " + e.getMessage());
         }
         return false;
     }
@@ -1550,37 +1599,59 @@ public class HopperProcessor extends ItemContainerState implements TickableBlock
     @Nonnull
     public static List<Ref<EntityStore>> getAllEntitiesInBox(HopperProcessor hp, Vector3i pos, float height, @Nonnull ComponentAccessor<EntityStore> components,  boolean players, boolean entities, boolean items) {
         final ObjectList<Ref<EntityStore>> results = SpatialResource.getThreadLocalReferenceList();
-        final Vector3d min = new Vector3d(pos.x-.1, pos.y , pos.z-.1);
-        final Vector3d max = new Vector3d(pos.x+.1, pos.y, pos.z+.1);
+        final Vector3d center = new Vector3d(pos.x, pos.y, pos.z);
+
+        // Use the provided height parameter (caller-controlled) rather than hardcoded values.
+        final double queryHeight = Math.max(1.0f, height);
+
         if (entities) {
-            //components.getResource(EntityModule.get().getEntitySpatialResourceType()).getSpatialStructure().collectCylinder(new Vector3d(pos.x,pos.y,pos.z), 2,4,results );
+            // If you later want to query entities, enable and tune radius/height here.
+            // components.getResource(EntityModule.get().getEntitySpatialResourceType()).getSpatialStructure().collectCylinder(center, 2, queryHeight, results);
         }
         if (players) {
-            components.getResource(EntityModule.get().getPlayerSpatialResourceType()).getSpatialStructure().collectCylinder(new Vector3d(pos.x,pos.y,pos.z), 4, 8, results );
+            components.getResource(EntityModule.get().getPlayerSpatialResourceType()).getSpatialStructure().collectCylinder(center, 4, queryHeight, results);
         }
         if (items) {
-                //components.getResource(EntityModule.get().getItemSpatialResourceType()).getSpatialStructure().collectCylinder(new Vector3d(pos.x,pos.y,pos.z), 2,4,results );
+            // items typically don't need as large a radius; tune if necessary
+            // components.getResource(EntityModule.get().getItemSpatialResourceType()).getSpatialStructure().collectCylinder(center, 2, queryHeight, results);
         }
-        hp.ca = components;
+
+        // Prefer reusing the instance buffer when available to avoid allocating a new list each tick.
+        if (hp != null && hp.nearbyBuffer != null) {
+            hp.nearbyBuffer.clear();
+            hp.nearbyBuffer.addAll(results);
+            return hp.nearbyBuffer;
+        }
+
         // Return a copy so callers iterating the result are not affected if the
         // thread-local list is reused by a nested spatial query (e.g. inside throwItem).
         return new ArrayList<>(results);
     }
     public static List<Ref<EntityStore>> getAllItemsInBox(HopperProcessor hp, Vector3i pos, float height, @Nonnull ComponentAccessor<EntityStore> components,  boolean players, boolean entities, boolean items) {
         final ObjectList<Ref<EntityStore>> results = SpatialResource.getThreadLocalReferenceList();
-        final Vector3d min = new Vector3d(pos.x-.5, pos.y-.5 , pos.z-.5);
-        final Vector3d max = new Vector3d(pos.x+.5, pos.y+.5, pos.z+.5);
+        final Vector3d center = new Vector3d(pos.x, pos.y, pos.z);
+        final double queryHeight = Math.max(0.5f, height);
+
         if (entities) {
+            final Vector3d min = new Vector3d(pos.x - 0.5, pos.y - 0.5, pos.z - 0.5);
+            final Vector3d max = new Vector3d(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
             components.getResource(EntityModule.get().getEntitySpatialResourceType()).getSpatialStructure().collectBox(min, max, results);
         }
         if (players) {
-            //components.getResource(EntityModule.get().getPlayerSpatialResourceType()).getSpatialStructure().collectCylinder(new Vector3d(pos.x,pos.y,pos.z), 4, 8, results );
+            // tuned out by default; enable/adjust if visuals should affect players
+            // components.getResource(EntityModule.get().getPlayerSpatialResourceType()).getSpatialStructure().collectCylinder(center, 4, queryHeight, results );
         }
         if (items) {
-            
-            components.getResource(EntityModule.get().getItemSpatialResourceType()).getSpatialStructure().collectCylinder(new Vector3d(pos.x,pos.y,pos.z), 8,6,results );
+            // Use a tighter radius/height for item queries to reduce returned set size
+            components.getResource(EntityModule.get().getItemSpatialResourceType()).getSpatialStructure().collectCylinder(center, 2, Math.max(0.5, queryHeight), results );
         }
-        hp.ca = components;
+
+        if (hp != null && hp.nearbyBuffer != null) {
+            hp.nearbyBuffer.clear();
+            hp.nearbyBuffer.addAll(results);
+            return hp.nearbyBuffer;
+        }
+
         return new ArrayList<>(results);
     }
 

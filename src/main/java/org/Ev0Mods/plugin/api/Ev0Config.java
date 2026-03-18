@@ -21,8 +21,7 @@ public class Ev0Config {
     // Default values
     private static int tierMultiplier = 4; // Default value - transfers tier * 4 items per tick
     private static boolean fluidTransferEnabled = true; // Enable/disable fluid import/export
-    private static boolean debugMode = false; // Enable debug logging
-    private static boolean loggingEnabled = false; // Master logging switch (default: false)
+    private static boolean debugMode = false; // Enable debug logging (used as master logging switch)
 
     // Config file path (set by plugin)
     private static Path configFilePath = null;
@@ -97,11 +96,7 @@ public class Ev0Config {
             debugMode = Boolean.parseBoolean(debug.trim());
         }
 
-        // Master Logging
-        String logging = props.getProperty("enableLogging");
-        if (logging != null) {
-            loggingEnabled = Boolean.parseBoolean(logging.trim());
-        }
+        // Master Logging uses debugMode (no separate enableLogging property)
     }
 
     /**
@@ -111,7 +106,6 @@ public class Ev0Config {
         props.setProperty("tierMultiplier", String.valueOf(tierMultiplier));
         props.setProperty("fluidTransferEnabled", String.valueOf(fluidTransferEnabled));
         props.setProperty("debugMode", String.valueOf(debugMode));
-        props.setProperty("enableLogging", String.valueOf(loggingEnabled));
 
         try {
             // Ensure parent directory exists
@@ -157,7 +151,6 @@ public class Ev0Config {
         props.setProperty("tierMultiplier", String.valueOf(tierMultiplier));
         props.setProperty("fluidTransferEnabled", String.valueOf(fluidTransferEnabled));
         props.setProperty("debugMode", String.valueOf(debugMode));
-        props.setProperty("enableLogging", String.valueOf(loggingEnabled));
 
         try {
             try (OutputStream output = Files.newOutputStream(configFilePath)) {
@@ -189,7 +182,7 @@ public class Ev0Config {
     }
 
     public static boolean isLoggingEnabled() {
-        return loggingEnabled;
+        return debugMode;
     }
 
     // Setters with save
@@ -210,7 +203,7 @@ public class Ev0Config {
     }
 
     public static void setLoggingEnabled(boolean enabled) {
-        loggingEnabled = enabled;
-        if (initialized) save();
+        // Backwards-compatible setter: toggle debugMode when callers set loggingEnabled
+        setDebugMode(enabled);
     }
 }
