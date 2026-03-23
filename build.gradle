@@ -63,7 +63,17 @@ repositories {
 dependencies {
     compileOnly("com.hypixel.hytale:Server:$hytale_build")
     if (hasHytaleHome) {
+        // Add local Hytale server jar to compile classpath for IDEs that don't resolve the remote Maven artifact.
+        compileOnly(files("$hytaleHome/install/$patchline/package/game/latest/Server/HytaleServer.jar"))
         runtimeOnly(files("$hytaleHome/install/$patchline/package/game/latest/Server/HytaleServer.jar"))
+    }
+
+    // Also include prerelease server jar if present at the typical prerelease path.
+    def prereleaseJarPath = file("C:/Users/${System.getProperty('user.name')}/AppData/Roaming/Hytale/install/pre-release/package/game/latest/Server/HytaleServer.jar")
+    if (prereleaseJarPath.exists()) {
+        compileOnly(files(prereleaseJarPath))
+        runtimeOnly(files(prereleaseJarPath))
+        logger.lifecycle("Included prerelease HytaleServer.jar from: ${prereleaseJarPath}")
     }
 
     // Your dependencies here

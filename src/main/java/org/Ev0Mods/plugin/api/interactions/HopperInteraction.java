@@ -22,6 +22,8 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Random;
 import java.util.logging.Level;
+import org.Ev0Mods.plugin.api.Ev0Log;
+import org.Ev0Mods.plugin.Ev0Lib;
 
 import org.checkerframework.checker.nullness.compatqual.NonNullDecl;
 import org.checkerframework.checker.nullness.compatqual.NullableDecl;
@@ -37,7 +39,9 @@ public class HopperInteraction extends SimpleBlockInteraction {
 
         try {
             PlayerRef pref = store.getComponent(playerEnt, PlayerRef.getComponentType());
-            //HytaleLogger.getLogger().atInfo().log("HopperInteraction: interactWithBlock called, pref=" + pref);
+            Ev0Log.info(HytaleLogger.forEnclosingClass(), "HopperInteraction: interactWithBlock called, pref=" + pref + " pos=" + vector3i);
+            // Unconditional warning log for diagnostics (bypass Ev0Config gating)
+            HytaleLogger.forEnclosingClass().atWarning().log("[Ev0Lib][DIAG] HopperInteraction invoked for player=" + pref + " pos=" + vector3i);
             if (pref != null) {
                 try {
                     // Resolve held item key so the UI can offer quick-add
@@ -59,17 +63,31 @@ public class HopperInteraction extends SimpleBlockInteraction {
                             if (probe != null) heldItemId = String.valueOf(probe);
                         } catch (Throwable ignored) {}
                     }
+                    // Diagnostic: log block type & state before opening UI
+                    try {
+                        Object chunk = store.getExternalData().getWorld().getChunkIfInMemory(com.hypixel.hytale.math.util.ChunkUtil.indexChunkFromBlock(vector3i.x, vector3i.z));
+                        if (chunk != null) {
+                            Object bt = org.Ev0Mods.plugin.api.component.EngineCompat.getBlockType(chunk, vector3i.x, vector3i.y, vector3i.z);
+                            Object st = org.Ev0Mods.plugin.api.component.EngineCompat.getState(chunk, vector3i.x, vector3i.y, vector3i.z);
+                            HytaleLogger.forEnclosingClass().atWarning().log("[Ev0Lib][DIAG] HopperInteraction: blockType=" + (bt==null?"null":bt.getClass().getName()+" -> "+bt.toString()) + ", state=" + (st==null?"null":st.getClass().getName()));
+                        } else {
+                            HytaleLogger.forEnclosingClass().atWarning().log("[Ev0Lib][DIAG] HopperInteraction: chunk null at pos=" + vector3i);
+                        }
+                    } catch (Throwable ignored) {}
                     // Open the HyUI-based hopper filter page
                     org.Ev0Mods.plugin.api.ui.HopperUIPage.open(pref, store, vector3i, heldItemId);
-                    //HytaleLogger.getLogger().atInfo().log("HopperInteraction: opened HopperUIPage via HyUI PageBuilder, heldItem=" + heldItemId);
+                    Ev0Log.info(HytaleLogger.forEnclosingClass(), "HopperInteraction: requested HopperUIPage.open for player=" + pref + " pos=" + vector3i + " held=" + heldItemId);
+                    HytaleLogger.forEnclosingClass().atWarning().log("[Ev0Lib][DIAG] HopperInteraction requested UI open for player=" + pref + " pos=" + vector3i + " held=" + heldItemId);
                 } catch (Throwable t) {
-                    //HytaleLogger.getLogger().at(Level.WARNING).log("HopperInteraction: failed to open HopperUIPage: " + t.getMessage());
+                    Ev0Log.warn(HytaleLogger.forEnclosingClass(), "HopperInteraction: failed to open HopperUIPage: " + t.getMessage());
                 }
             } else {
-                //HytaleLogger.getLogger().at(Level.WARNING).log("HopperInteraction: PlayerRef null when interacting");
+                Ev0Log.warn(HytaleLogger.forEnclosingClass(), "HopperInteraction: PlayerRef null when interacting");
+                HytaleLogger.forEnclosingClass().atWarning().log("[Ev0Lib][DIAG] HopperInteraction: PlayerRef null when interacting at pos=" + vector3i);
             }
         } catch (Throwable t) {
-            //HytaleLogger.getLogger().at(Level.WARNING).log("HopperInteraction: outer failure: " + t.getMessage());
+            Ev0Log.warn(HytaleLogger.forEnclosingClass(), "HopperInteraction: outer failure: " + t.getMessage());
+            HytaleLogger.forEnclosingClass().atWarning().log("[Ev0Lib][DIAG] HopperInteraction outer failure: " + t);
         }
     }
 

@@ -22,8 +22,6 @@ public class IdOutput  implements ItemHandler{
             .documentation("Outputs an item based on its Item ID.")
             .append(new KeyedCodec<>("ItemId", Codec.STRING, true), (i, v) -> i.itemId = v, i -> i.itemId)
             .documentation("The ID of the item to output.")
-            .addValidator(Validators.nonNull())
-            .addValidator(Item.VALIDATOR_CACHE.getValidator())
             .add()
             .append(new KeyedCodec<>("Amount", ProtocolCodecs.RANGEF), (i, v) -> i.amount = v, i -> i.amount)
             .documentation("The amount of the item to produce. Defaults to 1.")
@@ -32,21 +30,20 @@ public class IdOutput  implements ItemHandler{
             .documentation("Optional metadata for the item.")
             .add()
             .build();
-    @Nonnull
-    protected String itemId = "Empty";
+    protected String itemId = null;
     protected Rangef amount = new Rangef(1, 1);
     @Nullable
     protected BsonDocument metadata = BsonDocument.parse("{}");
     @Override
     public void output(Consumer<ItemStack> consumer) {
-        if (!"Empty".equals(this.itemId)) {
+        if (this.itemId != null && !this.itemId.isEmpty()) {
             consumer.accept(new ItemStack(this.itemId, MathHelper.fromRange(this.amount), this.metadata));
         }
     }
 
     @Override
     public void input(Consumer<ItemStack> inputConsumer) {
-        if (!"Empty".equals(this.itemId)) {
+        if (this.itemId != null && !this.itemId.isEmpty()) {
             inputConsumer.accept(new ItemStack(this.itemId, MathHelper.fromRange(this.amount), this.metadata));
         }
     }

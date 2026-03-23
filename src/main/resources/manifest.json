@@ -1,7 +1,7 @@
 {
     "Group": "Ev0sMods",
     "Name": "Ev0Lib",
-    "Version": "1.4.5",
+    "Version": "1.4.6",
     "Description": "Ev0's Libs",
     "Authors": [
         {
@@ -9,7 +9,7 @@
         }
     ],
     "Website": "https://github.com/Evolut-ion/Ev0Libs",
-    "ServerVersion": "2026.02.19-1a311a592",
+    "ServerVersion": "2026.03.19-c0865d17c",
     "Dependencies": {
         
     },

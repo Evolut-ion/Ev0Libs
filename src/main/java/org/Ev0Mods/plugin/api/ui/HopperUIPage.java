@@ -5,6 +5,7 @@ import au.ellie.hyui.builders.PageBuilder;
 import au.ellie.hyui.events.UIContext;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
+import org.Ev0Mods.plugin.api.Ev0Log;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.math.vector.Vector3i;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
@@ -13,7 +14,9 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import org.Ev0Mods.plugin.api.component.HopperComponent;
 import org.Ev0Mods.plugin.api.block.state.HopperProcessor;
+import org.Ev0Mods.plugin.Ev0Lib;
 
 import java.util.List;
 
@@ -44,7 +47,7 @@ public final class HopperUIPage {
     public static void open(PlayerRef playerRef, Store<EntityStore> store, Vector3i pos, String heldItemId) {
         String activeTab = ACTIVE_TAB.getOrDefault(playerRef, "Status");
         // Resolve hopper state to populate initial label values
-        HopperProcessor hp = lookupHopper(store, pos);
+        HopperComponent hp = lookupHopper(store, pos);
 
         String mode = "Off";
         String wlText = "(empty)";
@@ -96,7 +99,7 @@ public final class HopperUIPage {
             if (heldDisplay != null) {
                 final String heldId = heldDisplay;
                 builder.addEventListener("addHeldWl", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
-                    HopperProcessor hopper = lookupHopper(store, pos);
+                    HopperComponent hopper = lookupHopper(store, pos);
                     if (hopper == null) return;
                     for (String e : hopper.getWhitelist())
                         if (e != null && e.equalsIgnoreCase(heldId)) return;
@@ -104,7 +107,7 @@ public final class HopperUIPage {
                     refreshLabels(ctx, store, pos);
                 });
                 builder.addEventListener("addHeldBl", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
-                    HopperProcessor hopper = lookupHopper(store, pos);
+                    HopperComponent hopper = lookupHopper(store, pos);
                     if (hopper == null) return;
                     for (String e : hopper.getBlacklist())
                         if (e != null && e.equalsIgnoreCase(heldId)) return;
@@ -115,7 +118,7 @@ public final class HopperUIPage {
             builder.addEventListener("addWl", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
                 ctx.getValue("itemInput", String.class).ifPresent(text -> {
                     if (text.isBlank()) return;
-                    HopperProcessor hopper = lookupHopper(store, pos);
+                    HopperComponent hopper = lookupHopper(store, pos);
                     if (hopper == null) return;
                     String id = text.trim();
                     for (String e : hopper.getWhitelist())
@@ -127,7 +130,7 @@ public final class HopperUIPage {
             builder.addEventListener("addBl", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
                 ctx.getValue("itemInput", String.class).ifPresent(text -> {
                     if (text.isBlank()) return;
-                    HopperProcessor hopper = lookupHopper(store, pos);
+                    HopperComponent hopper = lookupHopper(store, pos);
                     if (hopper == null) return;
                     String id = text.trim();
                     for (String e : hopper.getBlacklist())
@@ -137,43 +140,43 @@ public final class HopperUIPage {
                 });
             });
             builder.addEventListener("removeWl", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
-                HopperProcessor hopper = lookupHopper(store, pos);
+                HopperComponent hopper = lookupHopper(store, pos);
                 if (hopper == null) return;
                 hopper.removeLastFromWhitelist();
                 refreshLabels(ctx, store, pos);
             });
             builder.addEventListener("removeBl", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
-                HopperProcessor hopper = lookupHopper(store, pos);
+                HopperComponent hopper = lookupHopper(store, pos);
                 if (hopper == null) return;
                 hopper.removeLastFromBlacklist();
                 refreshLabels(ctx, store, pos);
             });
             builder.addEventListener("clearWl", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
-                HopperProcessor hopper = lookupHopper(store, pos);
+                HopperComponent hopper = lookupHopper(store, pos);
                 if (hopper == null) return;
                 hopper.clearWhitelist();
                 refreshLabels(ctx, store, pos);
             });
             builder.addEventListener("clearBl", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
-                HopperProcessor hopper = lookupHopper(store, pos);
+                HopperComponent hopper = lookupHopper(store, pos);
                 if (hopper == null) return;
                 hopper.clearBlacklist();
                 refreshLabels(ctx, store, pos);
             });
             builder.addEventListener("modeOff", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
-                HopperProcessor hopper = lookupHopper(store, pos);
+                HopperComponent hopper = lookupHopper(store, pos);
                 if (hopper == null) return;
                 hopper.setFilterMode("Off");
                 refreshLabels(ctx, store, pos);
             });
             builder.addEventListener("modeWl", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
-                HopperProcessor hopper = lookupHopper(store, pos);
+                HopperComponent hopper = lookupHopper(store, pos);
                 if (hopper == null) return;
                 hopper.setFilterMode("Whitelist");
                 refreshLabels(ctx, store, pos);
             });
             builder.addEventListener("modeBl", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
-                HopperProcessor hopper = lookupHopper(store, pos);
+                HopperComponent hopper = lookupHopper(store, pos);
                 if (hopper == null) return;
                 hopper.setFilterMode("Blacklist");
                 refreshLabels(ctx, store, pos);
@@ -181,15 +184,15 @@ public final class HopperUIPage {
         }
 
         // ── Signals tab listeners (only when Signals tab is active) ────────
-        if ("Signals".equals(activeTab) && HopperProcessor.ARCIO_PRESENT) {
+        if ("Signals".equals(activeTab) && HopperComponent.ARCIO_PRESENT) {
             builder.addEventListener("arcioIgnoreSignal", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
-                HopperProcessor hopper = lookupHopper(store, pos);
+                HopperComponent hopper = lookupHopper(store, pos);
                 if (hopper == null) return;
                 hopper.setArcioMode("IgnoreSignal");
                 refreshLabels(ctx, store, pos);
             });
             builder.addEventListener("arcioEnableSignal", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
-                HopperProcessor hopper = lookupHopper(store, pos);
+                HopperComponent hopper = lookupHopper(store, pos);
                 if (hopper == null) return;
                 hopper.setArcioMode("EnableWhenSignal");
                 refreshLabels(ctx, store, pos);
@@ -197,7 +200,13 @@ public final class HopperUIPage {
         }
 
         builder.open(store);
-        //LOGGER.atInfo().log("HopperUI: opened page for pos=" + pos + " player=" + playerRef);
+        Ev0Log.info(LOGGER, "HopperUI: opened page for pos=" + pos + " player=" + playerRef);
+        // Unconditional log so we can see UI opens even if Ev0Config gating prevents info logs
+        LOGGER.atWarning().log("[Ev0Lib][DIAG] HopperUI opened for player=" + playerRef + " pos=" + pos + " hopperPresent=" + (hp != null));
+        if (hp == null) {
+            Ev0Log.warn(LOGGER, "HopperUI: no hopper found at pos=" + pos + " when opening UI");
+            LOGGER.atWarning().log("[Ev0Lib][DIAG] HopperUI lookup returned null for pos=" + pos);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -362,7 +371,7 @@ public final class HopperUIPage {
     // ─────────────────────────────────────────────────────────────────────────
 
     private static void refreshLabels(UIContext ctx, Store<EntityStore> store, Vector3i pos) {
-        HopperProcessor hp = lookupHopper(store, pos);
+        HopperComponent hp = lookupHopper(store, pos);
         if (hp == null) return;
 
         ctx.getById("modeLabel", LabelBuilder.class)
@@ -406,16 +415,58 @@ public final class HopperUIPage {
     // Hopper state lookup
     // ─────────────────────────────────────────────────────────────────────────
 
-    private static HopperProcessor lookupHopper(Store<EntityStore> store, Vector3i pos) {
+    private static HopperComponent lookupHopper(Store<EntityStore> store, Vector3i pos) {
         try {
             World world = store.getExternalData().getWorld();
             if (world == null) return null;
             WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(pos.x, pos.z));
-            if (chunk == null) return null;
-            Object state = chunk.getState(pos.x, pos.y, pos.z);
-            return (state instanceof HopperProcessor hp) ? hp : null;
+            if (chunk == null) {
+                LOGGER.atWarning().log("[Ev0Lib][DIAG] lookupHopper: chunk null at pos=" + pos);
+                return null;
+            }
+            // First, attempt to locate a component-backed hopper
+            try {
+                var cs = world.getChunkStore().getStore();
+                var chunkRef = world.getChunkStore().getChunkReference(ChunkUtil.indexChunkFromBlock(pos.x, pos.z));
+                if (chunkRef != null) {
+                    com.hypixel.hytale.server.core.universe.world.chunk.BlockComponentChunk bcc = (com.hypixel.hytale.server.core.universe.world.chunk.BlockComponentChunk) cs.getComponent(chunkRef, com.hypixel.hytale.server.core.universe.world.chunk.BlockComponentChunk.getComponentType());
+                    if (bcc != null) {
+                        com.hypixel.hytale.component.Ref<com.hypixel.hytale.server.core.universe.world.storage.ChunkStore> blockRef = bcc.getEntityReference(com.hypixel.hytale.math.util.ChunkUtil.indexBlockInColumn(pos.x, pos.y, pos.z));
+                        if (blockRef != null) {
+                            Ev0Lib lib = Ev0Lib.getInstance();
+                            if (lib != null) {
+                                var compType = lib.getHopperComponentType();
+                                if (compType != null) {
+                                    Object comp = cs.getComponent(blockRef, compType);
+                                    if (comp instanceof HopperComponent hc) {
+                                        LOGGER.atWarning().log("[Ev0Lib][DIAG] lookupHopper: found component HopperComponent at pos=" + pos);
+                                        return hc;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
+
+            // Fallback: legacy state-based lookup for compatibility
+            Object state = org.Ev0Mods.plugin.api.component.EngineCompat.getState(chunk, pos.x, pos.y, pos.z);
+            Object blockType = org.Ev0Mods.plugin.api.component.EngineCompat.getBlockType(chunk, pos.x, pos.y, pos.z);
+            LOGGER.atWarning().log("[Ev0Lib][DIAG] lookupHopper: blockType=" + (blockType == null ? "null" : blockType.getClass().getName() + " -> " + blockType.toString()));
+            if (state == null) {
+                LOGGER.atWarning().log("[Ev0Lib][DIAG] lookupHopper: no state object at pos=" + pos + " (chunk exists)");
+                return null;
+            }
+            LOGGER.atWarning().log("[Ev0Lib][DIAG] lookupHopper: found state class=" + state.getClass().getName() + " at pos=" + pos);
+            if (state instanceof HopperProcessor hpState) {
+                HopperComponent hc = new HopperComponent();
+                try { hc.data = hpState.data; } catch (Throwable ignored) {}
+                return hc;
+            }
+            return null;
         } catch (Throwable t) {
-            //LOGGER.atWarning().log("HopperUI: failed to lookup hopper at " + pos + ": " + t.getMessage());
+            Ev0Log.warn(LOGGER, "HopperUI: failed to lookup hopper at " + pos + ": " + t.getMessage());
+            LOGGER.atWarning().log("[Ev0Lib][DIAG] HopperUI lookup failed for pos=" + pos + ": " + t);
             return null;
         }
     }

@@ -23,7 +23,7 @@ import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHa
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
-import com.hypixel.hytale.server.core.universe.world.meta.BlockState;
+// BlockState moved/removed in prerelease; not required here (use EngineCompat)
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import org.Ev0Mods.plugin.api.block.state.HopperProcessor;
 import org.checkerframework.checker.nullness.compatqual.NonNullDecl;
@@ -49,18 +49,24 @@ public class WrenchInteraction extends SimpleBlockInteraction {
         WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(contextTargetBlock.x, contextTargetBlock.z));
 
         assert chunk != null;
-        BlockState var11 = chunk.getState(contextTargetBlock.x, contextTargetBlock.y, contextTargetBlock.z);
+        Object var11 = org.Ev0Mods.plugin.api.component.EngineCompat.getState(chunk, contextTargetBlock.x, contextTargetBlock.y, contextTargetBlock.z);
         if (var11 instanceof HopperProcessor) {
             HopperProcessor c = (HopperProcessor)var11;
-            HopperProcessor cx = (HopperProcessor)chunk.getState(contextTargetBlock.x, contextTargetBlock.y, contextTargetBlock.z);
-            for (int v = 0; v < c.data.substitutions.length; ++v) {
-                //((HytaleLogger.Api) HytaleLogger.getLogger().atInfo()).log(c.data.substitutions[0]);
-                ItemStack is = new ItemStack(c.data.substitutions[this.r.nextInt(c.data.substitutions.length)]);
+            HopperProcessor cx = (HopperProcessor)org.Ev0Mods.plugin.api.component.EngineCompat.getState(chunk, contextTargetBlock.x, contextTargetBlock.y, contextTargetBlock.z);
+            // Prefer new ComponentMap storage, fall back to legacy StateData field
+            String[] substitutions = null;
+            try {
+                Object o = org.Ev0Mods.plugin.api.component.CompatAdapters.readStateFieldOrComponent(c, c.data, "substitutions", "ev0s:hopper", "substitutions");
+                if (o instanceof String[]) substitutions = (String[]) o;
+            } catch (Throwable ignored) {
+            }
+            if (substitutions == null || substitutions.length == 0) return;
+            for (int v = 0; v < substitutions.length; ++v) {
+                ItemStack is = new ItemStack(substitutions[this.r.nextInt(substitutions.length)]);
                 Item i = is.getItem();
                 String blockKey = is.getBlockKey();
                 if (i.getBlockId() != null) {
-                    chunk.setBlock(contextTargetBlock.x, contextTargetBlock.y, contextTargetBlock.z, blockKey);
-
+                    org.Ev0Mods.plugin.api.component.EngineCompat.setBlock(chunk, contextTargetBlock.x, contextTargetBlock.y, contextTargetBlock.z, blockKey);
                 }
             }
         }

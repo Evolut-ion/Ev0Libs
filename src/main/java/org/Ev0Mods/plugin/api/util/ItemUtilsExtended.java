@@ -226,7 +226,7 @@ public class ItemUtilsExtended {
         //Vector3d throwPosition = transformComponent.getPosition().clone();
         //Model model = modelComponent.getModel();
         //throwPosition.add((double)0.0F, .5f, (double)0.0F).add(throwDirection);
-        Vector3d spawnPos = new Vector3d(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
+        Vector3d spawnPos = new Vector3d(pos.x, pos.y + 0.5, pos.z + 0.5);
         Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, spawnPos, Vector3f.ZERO, 0, 0, 0);
         if (itemEntityHolder == null) {
             return null;
@@ -277,18 +277,9 @@ public class ItemUtilsExtended {
         }
     }
     public static Ref<EntityStore> throwItem(String blockId, String side, Vector3d pos, @Nonnull Ref<EntityStore> ref, @Nonnull ComponentAccessor<EntityStore> store, @Nonnull ItemStack itemStack, @Nonnull Vector3d throwDirection, float throwSpeed) {
-        TransformComponent transformComponent = (TransformComponent)store.getComponent(ref, TransformComponent.getComponentType());
-
-        assert transformComponent != null;
-
-        //assert modelComponent != null;
-
-        Vector3d throwPosition = transformComponent.getPosition().clone();
-        throwPosition.add((double)0.5F, .25, (double).5F);
-
         // Use block-centered spawn position like Ev0Libs
         Vector3d spawnPos = new Vector3d(pos.x + 0.5, pos.y + 0.2, pos.z + 0.5);
-        Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, spawnPos, Vector3f.ZERO, 0, -1, 0);
+        Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop(store, itemStack, spawnPos, Vector3f.ZERO, 0, 0, 0);
         if (itemEntityHolder == null) {
             return null;
         } else {
