@@ -181,6 +181,12 @@ public final class HopperUIPage {
                 hopper.setFilterMode("Blacklist");
                 refreshLabels(ctx, store, pos);
             });
+            builder.addEventListener("modeSingleton", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
+                HopperComponent hopper = lookupHopper(store, pos);
+                if (hopper == null) return;
+                hopper.setFilterMode("Singleton");
+                refreshLabels(ctx, store, pos);
+            });
         }
 
         // ── Signals tab listeners (only when Signals tab is active) ────────
@@ -344,6 +350,7 @@ public final class HopperUIPage {
                                 <button id="modeOff" class="primary-button" style="padding: 8 20;">Off</button>
                                 <button id="modeWl" class="primary-button" style="padding: 8 20;">Whitelist</button>
                                 <button id="modeBl" class="primary-button" style="padding: 8 20;">Blacklist</button>
+                                <button id="modeSingleton" class="primary-button" style="padding: 8 20;">Singleton</button>
                             </div>
                 """.formatted(wlText, blText, heldSection);
     }

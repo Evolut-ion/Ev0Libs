@@ -382,10 +382,14 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
         return typedBuffer.get(p);
     }
 
+    public boolean isSingletonMode() {
+        return "Singleton".equalsIgnoreCase(filterMode);
+    }
+
     // Returns true when the given block key is allowed to be imported according to filter state
     private boolean isItemAllowedByFilter(String blockKey) {
-        // If mode is not set or Off, allow everything
-        if (filterMode == null || filterMode.equalsIgnoreCase("Off")) return true;
+        // If mode is not set or Off or Singleton, allow everything
+        if (filterMode == null || filterMode.equalsIgnoreCase("Off") || filterMode.equalsIgnoreCase("Singleton")) return true;
 
         // Whitelist mode: if whitelist is empty/null, block everything. Only allow exact matches.
         if (filterMode.equalsIgnoreCase("Whitelist")) {
@@ -1329,7 +1333,10 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
             if (blockKey == null) blockKey = resolveItemStackKey(stack);
             if (!isItemAllowedByFilter(blockKey)) continue;
 
-                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
+                int available = stack.getQuantity();
+                // Singleton mode: leave at least 1 item in the source slot so auto-refill mods keep working
+                if (isSingletonMode() && available <= 1) continue;
+                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), isSingletonMode() ? available - 1 : available);
                 if (transferAmount <= 0) continue;
 
                 ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, stack.withQuantity(transferAmount));
@@ -1379,7 +1386,10 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                 if (otherKey == null) otherKey = resolveItemStackKey(otherStack);
                 if (!isItemAllowedByFilter(otherKey)) continue;
 
-                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), otherStack.getQuantity());
+                int otherAvailable = otherStack.getQuantity();
+                // Singleton mode: leave at least 1 item in the other hopper's slot
+                if (isSingletonMode() && otherAvailable <= 1) continue;
+                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), isSingletonMode() ? otherAvailable - 1 : otherAvailable);
                 if (transferAmount <= 0) continue;
 
                 ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, otherStack.withQuantity(transferAmount));
@@ -1437,7 +1447,9 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                 try { probeKey2 = slotItem.getBlockKey(); } catch (Throwable ignored) {}
                 if (probeKey2 == null) probeKey2 = resolveItemStackKey(slotItem);
                 if (!isItemAllowedByFilter(probeKey2)) continue;
-                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), slotQty);
+                // Singleton mode: leave at least 1 item in the drawer slot
+                if (isSingletonMode() && slotQty <= 1) continue;
+                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), isSingletonMode() ? slotQty - 1 : slotQty);
                 if (transferAmount <= 0) continue;
                 ItemStack safeStack = slotItem.withQuantity(transferAmount);
                 ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, safeStack);
@@ -1485,8 +1497,11 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                 continue;
             }
 
+            int srcAvailable = stack.getQuantity();
+            // Singleton mode: leave at least 1 item in each source slot
+            if (isSingletonMode() && srcAvailable <= 1) continue;
             int transferAmount =
-                (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
+                (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), isSingletonMode() ? srcAvailable - 1 : srcAvailable);
             if (transferAmount <= 0) continue;
 
             ItemStack safeStack = stack.withQuantity(transferAmount);

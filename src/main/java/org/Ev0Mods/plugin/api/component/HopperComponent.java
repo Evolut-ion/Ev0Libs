@@ -294,8 +294,12 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
     public void setTypedBuffer(PlayerRef p, String v) { if (p == null) return; if (v == null) typedBuffer.remove(p); else typedBuffer.put(p, v); }
     public String getTypedBuffer(PlayerRef p) { if (p == null) return null; return typedBuffer.get(p); }
 
+    public boolean isSingletonMode() {
+        return "Singleton".equalsIgnoreCase(filterMode);
+    }
+
     private boolean isItemAllowedByFilter(String blockKey) {
-        if (filterMode == null || filterMode.equalsIgnoreCase("Off")) return true;
+        if (filterMode == null || filterMode.equalsIgnoreCase("Off") || filterMode.equalsIgnoreCase("Singleton")) return true;
         if (filterMode.equalsIgnoreCase("Whitelist")) {
             synchronized (whitelist) { if (whitelist == null || whitelist.isEmpty()) return false; if (blockKey == null) return false; for (String s : whitelist) if (s != null && s.equalsIgnoreCase(blockKey)) return true; return false; }
         }
@@ -844,7 +848,9 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
                     String probeKeyPb = null; try { probeKeyPb = stack.getBlockKey(); } catch (Throwable ignored) {}
                     if (probeKeyPb == null) probeKeyPb = resolveItemStackKey(stack);
                     if (!isItemAllowedByFilter(probeKeyPb)) continue;
-                    int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity()); if (transferAmount <= 0) continue;
+                    int pbAvailable = stack.getQuantity();
+                    if (isSingletonMode() && pbAvailable <= 1) continue;
+                    int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), isSingletonMode() ? pbAvailable - 1 : pbAvailable); if (transferAmount <= 0) continue;
                     ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short)0, stack.withQuantity(transferAmount));
                     if (t.succeeded()) {
                         this.getItemContainer().removeItemStackFromSlot((short)0, transferAmount);
@@ -909,7 +915,9 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
             String probeKey2 = null; try { probeKey2 = stack.getBlockKey(); } catch (Throwable ignored) {}
             if (probeKey2 == null) probeKey2 = resolveItemStackKey(stack);
             if (!isItemAllowedByFilter(probeKey2)) continue;
-            int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity()); if (transferAmount <= 0) continue;
+            int srcAvailable = stack.getQuantity();
+            if (isSingletonMode() && srcAvailable <= 1) continue;
+            int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), isSingletonMode() ? srcAvailable - 1 : srcAvailable); if (transferAmount <= 0) continue;
             ItemStack safeStack = stack.withQuantity(transferAmount);
             ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short)0, safeStack);
             if (t.succeeded()) {
