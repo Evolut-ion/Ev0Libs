@@ -1,11 +1,14 @@
 package org.Ev0Mods.plugin.api.ui;
 
-import au.ellie.hyui.builders.LabelBuilder;
-import au.ellie.hyui.builders.PageBuilder;
-import au.ellie.hyui.events.UIContext;
+import java.util.List;
+
+import org.Ev0Mods.plugin.Ev0Lib;
+import org.Ev0Mods.plugin.api.Ev0Log;
+import org.Ev0Mods.plugin.api.block.state.HopperProcessor;
+import org.Ev0Mods.plugin.api.component.HopperComponent;
+
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
-import org.Ev0Mods.plugin.api.Ev0Log;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.math.vector.Vector3i;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
@@ -14,11 +17,10 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import org.Ev0Mods.plugin.api.component.HopperComponent;
-import org.Ev0Mods.plugin.api.block.state.HopperProcessor;
-import org.Ev0Mods.plugin.Ev0Lib;
 
-import java.util.List;
+import au.ellie.hyui.builders.LabelBuilder;
+import au.ellie.hyui.builders.PageBuilder;
+import au.ellie.hyui.events.UIContext;
 
 /**
  * Hopper filter UI page built with HyUI's PageBuilder + HYUIML.
