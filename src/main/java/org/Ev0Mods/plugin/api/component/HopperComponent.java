@@ -219,6 +219,48 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
         return null;
     }
 
+    // ── ECS component-based container discovery ──────────────────────
+    private static volatile List<Object> KNOWN_CONTAINER_COMP_TYPES = null;
+
+    private static List<Object> getKnownContainerComponentTypes() {
+        if (KNOWN_CONTAINER_COMP_TYPES != null) return KNOWN_CONTAINER_COMP_TYPES;
+        List<Object> types = new ArrayList<>();
+        try {
+            Class<?> cls = Class.forName("com.Ev0sMods.Ev0sWoodCutter.blockstates.FertilizerState");
+            java.lang.reflect.Field f = cls.getField("COMPONENT_TYPE");
+            Object ct = f.get(null);
+            if (ct != null) types.add(ct);
+        } catch (Throwable ignored) {}
+        KNOWN_CONTAINER_COMP_TYPES = types;
+        return types;
+    }
+
+    @SuppressWarnings("unchecked")
+    private ItemContainer getContainerViaECS(Vector3i pos) {
+        if (w == null) return null;
+        try {
+            Store<ChunkStore> cs = w.getChunkStore().getStore();
+            Ref<ChunkStore> chunkRef = w.getChunkStore().getChunkReference(
+                    ChunkUtil.indexChunkFromBlock(pos.x, pos.z));
+            if (chunkRef == null) return null;
+            BlockComponentChunk bcc = cs.getComponent(chunkRef, BlockComponentChunk.getComponentType());
+            if (bcc == null) return null;
+            Ref<ChunkStore> blockRef = bcc.getEntityReference(
+                    ChunkUtil.indexBlockInColumn(pos.x, pos.y, pos.z));
+            if (blockRef == null) return null;
+            for (Object compType : getKnownContainerComponentTypes()) {
+                try {
+                    Object comp = cs.getComponent(blockRef, (ComponentType<ChunkStore, ?>) compType);
+                    if (comp != null) {
+                        Object containerObj = getItemContainerFromState(comp);
+                        if (containerObj instanceof ItemContainer ic) return ic;
+                    }
+                } catch (Throwable ignored) {}
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
     public Vector3i getBlockPosition() { return cachedPosition; }
 
     // Prefer engine-provided position accessors if available (some engine versions
@@ -532,7 +574,7 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
             final WorldChunk chunk = w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(importPos.x, importPos.z)); if (chunk == null) continue;
             int targetFluidId = EngineCompat.getFluidId(chunk, importPos.x, importPos.y, importPos.z);
             Object state = EngineCompat.getState(chunk, importPos.x, importPos.y, importPos.z);
-            boolean hasContainer = (state != null && (state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") || state.getClass().getSimpleName().contains("ItemContainer")));
+            boolean hasContainer = (state != null && (state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") || state.getClass().getSimpleName().contains("ItemContainer") || getItemContainerFromState(state) != null)) || (state == null && getContainerViaECS(importPos) != null);
             ItemStack currentItem = this.getItemContainer().getItemStack((short)0);
             if (Ev0Config.isFluidTransferEnabled() && targetFluidId != 0 && currentItem == null && !hasContainer) {
                 ItemStack bucketStack = null; switch (targetFluidId) { case 2 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Red_Slime", 1, null); case 3 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Tar", 1, null); case 4 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Poison", 1, null); case 5 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Green_Slime", 1, null); case 6 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Lava", 1, null); case 7 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Water", 1, null); default -> bucketStack = null; }
@@ -569,7 +611,7 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
             final WorldChunk chunk = w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(exportPos.x, exportPos.z)); if (chunk == null) continue;
             Object state = EngineCompat.getState(chunk, exportPos.x, exportPos.y, exportPos.z);
             int targetFluidId = EngineCompat.getFluidId(chunk, exportPos.x, exportPos.y, exportPos.z);
-            boolean hasContainer = (state != null && (state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") || state.getClass().getSimpleName().contains("ItemContainer")));
+            boolean hasContainer = (state != null && (state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") || state.getClass().getSimpleName().contains("ItemContainer") || getItemContainerFromState(state) != null)) || (state == null && getContainerViaECS(exportPos) != null);
             try { HytaleLogger.getLogger().atInfo().log("[HopperDiag] export side=" + side + " exportPos=" + exportPos + " state=" + (state == null ? "null" : state.getClass().getSimpleName()) + " hasContainer=" + hasContainer); } catch (Throwable ignored) {}
             try { Ev0Log.info(LOGGER, "export probe: side=" + side + " exportPos=" + exportPos + " stateClass=" + (state == null ? "null" : state.getClass().getName()) + " hasContainer=" + hasContainer); } catch (Throwable ignored) {}
             ItemStack currentItem = this.getItemContainer().getItemStack((short) 0);
@@ -658,7 +700,7 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
                                     Object compType = getCompType.invoke(null);
                                     Object icbObj = null;
                                     try { icbObj = getComp.invoke(cs, blockRef, compType); } catch (Throwable ignored) { icbObj = null; }
-                                    if (!targetHasHopperComponent && icbObj != null && icbCls.isInstance(icbObj)) {
+                                    if (!targetHasHopperComponent && icbObj != null && icbCls.isInstance(icbObj) && getContainerViaECS(pos) == null) {
                                         try {
                                             Method getIC = icbCls.getMethod("getItemContainer");
                                             Object cont = getIC.invoke(icbObj);
@@ -835,8 +877,48 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
             } catch (Throwable ignored) {}
         }
 
-        if (state == null) return false;
-        if ((!(state != null && state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState")) && !state.getClass().getSimpleName().contains("ItemContainer"))) return false;
+        if (state == null) {
+            ItemContainer ecsContainer = getContainerViaECS(pos);
+            if (ecsContainer == null) return false;
+            if (!exportPhase) {
+                for (int slot = 0; slot < ecsContainer.getCapacity(); slot++) {
+                    ItemStack stack = ecsContainer.getItemStack((short) slot);
+                    if (stack == null) continue;
+                    String probeKey = null;
+                    try { probeKey = stack.getBlockKey(); } catch (Throwable ignored) {}
+                    if (probeKey == null) probeKey = resolveItemStackKey(stack);
+                    if (!isItemAllowedByFilter(probeKey)) continue;
+                    int srcAvailable = stack.getQuantity();
+                    if (isSingletonMode() && srcAvailable <= 1) continue;
+                    int transferAmount = isSingletonMode() && srcAvailable < data.tier * Ev0Config.getTierMultiplier() ? srcAvailable - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), srcAvailable);
+                    if (transferAmount <= 0) continue;
+                    ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, stack.withQuantity(transferAmount));
+                    if (t.succeeded()) {
+                        ecsContainer.removeItemStackFromSlot((short) slot, transferAmount);
+                        return true;
+                    }
+                }
+            }
+            if (exportPhase) {
+                ItemStack have = this.getItemContainer().getItemStack((short) 0);
+                if (have != null && have.getQuantity() > 0) {
+                    int haveQty = have.getQuantity();
+                    if (isSingletonMode() && haveQty <= 1) return false;
+                    int transferAmount = isSingletonMode() && haveQty < data.tier * Ev0Config.getTierMultiplier() ? haveQty - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), haveQty);
+                    ItemStack safeStack = have.withQuantity(transferAmount);
+                    for (int slot = 0; slot < ecsContainer.getCapacity(); slot++) {
+                        ItemStackSlotTransaction t = ecsContainer.addItemStackToSlot((short) slot, safeStack);
+                        if (t.succeeded()) {
+                            spawnVisualFor(safeStack, exportPhase, pos, side, entities);
+                            this.getItemContainer().removeItemStackFromSlot((short) 0, transferAmount);
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+        if (!state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") && !state.getClass().getSimpleName().contains("ItemContainer") && getItemContainerFromState(state) == null) return false;
         boolean isProcessingBench = (state != null && state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState"));
         Object bench = isProcessingBench ? state : null;
         if (isProcessingBench) {
@@ -850,7 +932,7 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
                     if (!isItemAllowedByFilter(probeKeyPb)) continue;
                     int pbAvailable = stack.getQuantity();
                     if (isSingletonMode() && pbAvailable <= 1) continue;
-                    int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), isSingletonMode() ? pbAvailable - 1 : pbAvailable); if (transferAmount <= 0) continue;
+                    int transferAmount = isSingletonMode() && pbAvailable < data.tier * Ev0Config.getTierMultiplier() ? pbAvailable - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), pbAvailable); if (transferAmount <= 0) continue;
                     ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short)0, stack.withQuantity(transferAmount));
                     if (t.succeeded()) {
                         this.getItemContainer().removeItemStackFromSlot((short)0, transferAmount);
@@ -863,7 +945,10 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
             if (containerStateObj == null) return false; ItemContainer target = (ItemContainer) containerStateObj;
             for (int slot = 0; slot < target.getCapacity(); slot++) {
                 if (!isItemAllowedByFilter(this.getItemContainer().getItemStack((short)0) == null ? null : this.getItemContainer().getItemStack((short)0).getBlockKey())) return false;
-                int transferAmount = (int)Math.min(data.tier * Ev0Config.getTierMultiplier(), this.getItemContainer().getItemStack((short)0).getQuantity());
+                int haveQty = this.getItemContainer().getItemStack((short)0).getQuantity();
+                if (isSingletonMode() && haveQty <= 1) return false;
+                int transferAmount = isSingletonMode() && haveQty < data.tier * Ev0Config.getTierMultiplier() ? haveQty - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), haveQty);
+                if (transferAmount <= 0) return false;
                 ItemStack safeStack = this.getItemContainer().getItemStack((short)0).withQuantity(transferAmount);
                 ItemStackSlotTransaction t = target.addItemStackToSlot((short) slot, safeStack);
                 if (t.succeeded()) {
@@ -882,10 +967,12 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
             try {
                 ItemStack hopperStack = this.getItemContainer().getItemStack((short)0);
                 if (hopperStack != null) {
+                    int hopperQty = hopperStack.getQuantity();
+                    if (isSingletonMode() && hopperQty <= 1) return false;
                     for (int slot = 0; slot < sourceContainer.getCapacity(); slot++) {
                         try {
                             if (!isItemAllowedByFilter(hopperStack.getBlockKey())) break;
-                            int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), hopperStack.getQuantity());
+                            int transferAmount = isSingletonMode() && hopperQty < data.tier * Ev0Config.getTierMultiplier() ? hopperQty - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), hopperQty);
                             if (transferAmount <= 0) break;
                             ItemStack safeStack = hopperStack.withQuantity(transferAmount);
                             ItemStackSlotTransaction t = sourceContainer.addItemStackToSlot((short) slot, safeStack);
@@ -917,7 +1004,7 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
             if (!isItemAllowedByFilter(probeKey2)) continue;
             int srcAvailable = stack.getQuantity();
             if (isSingletonMode() && srcAvailable <= 1) continue;
-            int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), isSingletonMode() ? srcAvailable - 1 : srcAvailable); if (transferAmount <= 0) continue;
+            int transferAmount = isSingletonMode() && srcAvailable < data.tier * Ev0Config.getTierMultiplier() ? srcAvailable - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), srcAvailable); if (transferAmount <= 0) continue;
             ItemStack safeStack = stack.withQuantity(transferAmount);
             ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short)0, safeStack);
             if (t.succeeded()) {
@@ -988,7 +1075,8 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
                                                         String blockKey = null; try { blockKey = stack.getBlockKey(); } catch (Throwable ignored) {}
                                                         if (blockKey == null) blockKey = resolveItemStackKey(stack);
                                                         if (!isItemAllowedByFilter(blockKey)) continue;
-                                                        int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
+                                                        if (isSingletonMode() && stack.getQuantity() <= 1) continue;
+                                                        int transferAmount = isSingletonMode() && stack.getQuantity() < data.tier * Ev0Config.getTierMultiplier() ? stack.getQuantity() - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
                                                         if (transferAmount <= 0) continue;
                                                         ItemStack safeStack = stack.withQuantity(transferAmount);
                                                         ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, safeStack);
@@ -1020,7 +1108,7 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
                                         Object compType = getCompType.invoke(null);
                                         Object icbObj = null;
                                         try { icbObj = getComp.invoke(cs, blockRef, compType); } catch (Throwable ignored) { icbObj = null; }
-                                        if (icbObj != null && icbCls.isInstance(icbObj)) {
+                                        if (icbObj != null && icbCls.isInstance(icbObj) && getContainerViaECS(pos) == null) {
                                             try {
                                                 Method getIC = icbCls.getMethod("getItemContainer");
                                                 Object cont = getIC.invoke(icbObj);
@@ -1034,7 +1122,8 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
                                                             String blockKey = null; try { blockKey = stack.getBlockKey(); } catch (Throwable ignored) {}
                                                             if (blockKey == null) blockKey = resolveItemStackKey(stack);
                                                             if (!isItemAllowedByFilter(blockKey)) continue;
-                                                            int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
+                                                            if (isSingletonMode() && stack.getQuantity() <= 1) continue;
+                                                            int transferAmount = isSingletonMode() && stack.getQuantity() < data.tier * Ev0Config.getTierMultiplier() ? stack.getQuantity() - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
                                                             if (transferAmount <= 0) continue;
                                                             ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short)0, stack.withQuantity(transferAmount));
                                                             try { HytaleLogger.getLogger().atInfo().log("[HopperDiag] componentContainer transferAttempt slot=" + slot + " amt=" + transferAmount + " tx=" + (t == null ? "null" : String.valueOf(t.succeeded()))); } catch (Throwable ignored) {}
@@ -1086,7 +1175,8 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
                                                                 String blockKey = null; try { blockKey = stack.getBlockKey(); } catch (Throwable ignored) {}
                                                                 if (blockKey == null) blockKey = resolveItemStackKey(stack);
                                                                 if (!isItemAllowedByFilter(blockKey)) continue;
-                                                                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
+                                                                if (isSingletonMode() && stack.getQuantity() <= 1) continue;
+                                                                int transferAmount = isSingletonMode() && stack.getQuantity() < data.tier * Ev0Config.getTierMultiplier() ? stack.getQuantity() - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
                                                                 if (transferAmount <= 0) continue;
                                                                 ItemStack safeStack = stack.withQuantity(transferAmount);
                                                                 ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short)0, safeStack);
@@ -1168,7 +1258,8 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
                             String blockKey = null; try { blockKey = stack.getBlockKey(); } catch (Throwable ignored) {}
                             if (blockKey == null) blockKey = resolveItemStackKey(stack);
                             if (!isItemAllowedByFilter(blockKey)) continue;
-                            int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
+                            if (isSingletonMode() && stack.getQuantity() <= 1) continue;
+                            int transferAmount = isSingletonMode() && stack.getQuantity() < data.tier * Ev0Config.getTierMultiplier() ? stack.getQuantity() - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
                             if (transferAmount <= 0) continue;
                             ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short)0, stack.withQuantity(transferAmount));
                             try { HytaleLogger.getLogger().atInfo().log("[HopperDiag] directContainer transferAttempt slot=" + slot + " amt=" + transferAmount + " tx=" + (t == null ? "null" : String.valueOf(t.succeeded()))); } catch (Throwable ignored) {}
@@ -1202,7 +1293,8 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
             if (blockKey == null) blockKey = resolveItemStackKey(stack);
             if (!isItemAllowedByFilter(blockKey)) continue;
 
-                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
+                if (isSingletonMode() && stack.getQuantity() <= 1) continue;
+                int transferAmount = isSingletonMode() && stack.getQuantity() < data.tier * Ev0Config.getTierMultiplier() ? stack.getQuantity() - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
                 if (transferAmount <= 0) continue;
 
                 ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, stack.withQuantity(transferAmount));
@@ -1242,7 +1334,30 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
         // Generic container import
         ItemContainer container = null;
         try { Object contObj = getItemContainerFromState(state); if (contObj instanceof ItemContainer) container = (ItemContainer) contObj; else container = getContainerFromItemContainerObject(contObj, 0); } catch (Throwable ignored) {}
-        if (container == null) { try { HytaleLogger.getLogger().atInfo().log("[HopperDiag] generic container null for state=" + (state == null ? "null" : state.getClass().getName())); } catch (Throwable ignored) {} return false; }
+        if (container == null) {
+            // ECS fallback: try to find a container via ECS component lookup
+            ItemContainer ecsContainer = getContainerViaECS(pos);
+            if (ecsContainer != null) {
+                for (int slot = 0; slot < ecsContainer.getCapacity(); slot++) {
+                    try {
+                        ItemStack stack = ecsContainer.getItemStack((short) slot);
+                        if (stack == null) continue;
+                        String blockKey = null; try { blockKey = stack.getBlockKey(); } catch (Throwable ignored) {}
+                        if (blockKey == null) blockKey = resolveItemStackKey(stack);
+                        if (!isItemAllowedByFilter(blockKey)) continue;
+                        if (isSingletonMode() && stack.getQuantity() <= 1) continue;
+                        int transferAmount = isSingletonMode() && stack.getQuantity() < data.tier * Ev0Config.getTierMultiplier() ? stack.getQuantity() - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
+                        if (transferAmount <= 0) continue;
+                        ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, stack.withQuantity(transferAmount));
+                        if (t != null && t.succeeded()) {
+                            ecsContainer.removeItemStackFromSlot((short) slot, transferAmount);
+                            return true;
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            }
+            return false;
+        }
         try { HytaleLogger.getLogger().atInfo().log("[HopperDiag] generic container capacity=" + container.getCapacity()); } catch (Throwable ignored) {}
         int cap = container.getCapacity();
         for (int slot = 0; slot < cap; slot++) {
@@ -1252,7 +1367,8 @@ public class HopperComponent implements Component<ChunkStore>, TickableBlockStat
                 String blockKey = null; try { blockKey = stack.getBlockKey(); } catch (Throwable ignored) {}
                 if (blockKey == null) blockKey = resolveItemStackKey(stack);
                 if (!isItemAllowedByFilter(blockKey)) continue;
-                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
+                if (isSingletonMode() && stack.getQuantity() <= 1) continue;
+                int transferAmount = isSingletonMode() && stack.getQuantity() < data.tier * Ev0Config.getTierMultiplier() ? stack.getQuantity() - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
                 if (transferAmount <= 0) continue;
                 ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short)0, stack.withQuantity(transferAmount));
                 try { HytaleLogger.getLogger().atInfo().log("[HopperDiag] genericContainer transferAttempt slot=" + slot + " amt=" + transferAmount + " tx=" + (t == null ? "null" : String.valueOf(t.succeeded()))); } catch (Throwable ignored) {}

@@ -288,6 +288,51 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
         return null;
     }
 
+    // ── ECS component-based container discovery ──────────────────────
+    // Lazy-discovered ComponentTypes from plugins that expose getItemContainer().
+    // Enables the hopper to interact with ECS-only block components
+    // (e.g. FertilizerState) that aren't visible via the legacy chunk.getState() API.
+    private static volatile List<Object> KNOWN_CONTAINER_COMP_TYPES = null;
+
+    private static List<Object> getKnownContainerComponentTypes() {
+        if (KNOWN_CONTAINER_COMP_TYPES != null) return KNOWN_CONTAINER_COMP_TYPES;
+        List<Object> types = new ArrayList<>();
+        try {
+            Class<?> cls = Class.forName("com.Ev0sMods.Ev0sWoodCutter.blockstates.FertilizerState");
+            java.lang.reflect.Field f = cls.getField("COMPONENT_TYPE");
+            Object ct = f.get(null);
+            if (ct != null) types.add(ct);
+        } catch (Throwable ignored) {}
+        KNOWN_CONTAINER_COMP_TYPES = types;
+        return types;
+    }
+
+    @SuppressWarnings("unchecked")
+    private ItemContainer getContainerViaECS(Vector3i pos) {
+        if (w == null) return null;
+        try {
+            Store<ChunkStore> cs = w.getChunkStore().getStore();
+            Ref<ChunkStore> chunkRef = w.getChunkStore().getChunkReference(
+                    ChunkUtil.indexChunkFromBlock(pos.x, pos.z));
+            if (chunkRef == null) return null;
+            BlockComponentChunk bcc = cs.getComponent(chunkRef, BlockComponentChunk.getComponentType());
+            if (bcc == null) return null;
+            Ref<ChunkStore> blockRef = bcc.getEntityReference(
+                    ChunkUtil.indexBlockInColumn(pos.x, pos.y, pos.z));
+            if (blockRef == null) return null;
+            for (Object compType : getKnownContainerComponentTypes()) {
+                try {
+                    Object comp = cs.getComponent(blockRef, (ComponentType<ChunkStore, ?>) compType);
+                    if (comp != null) {
+                        Object containerObj = getItemContainerFromState(comp);
+                        if (containerObj instanceof ItemContainer ic) return ic;
+                    }
+                } catch (Throwable ignored) {}
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
     // Engine-derived helpers (best-effort defaults when engine isn't wiring these in)
     public Vector3i getBlockPosition() {
         // Try to call a superclass-provided position accessor (engine may supply it)
@@ -687,7 +732,7 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                 // Only run if fluid transfer is enabled in config
                 int targetFluidId = org.Ev0Mods.plugin.api.component.EngineCompat.getFluidId(chunk, importPos.x, importPos.y, importPos.z);
                 Object state = org.Ev0Mods.plugin.api.component.EngineCompat.getState(chunk, importPos.x, importPos.y, importPos.z);
-                boolean hasContainer = (state != null && (state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") || state.getClass().getSimpleName().contains("ItemContainer")));
+                boolean hasContainer = (state != null && (state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") || state.getClass().getSimpleName().contains("ItemContainer") || getItemContainerFromState(state) != null)) || (state == null && getContainerViaECS(importPos) != null);
                 ItemStack currentItem = this.getItemContainer().getItemStack((short) 0);
                 
                 if (Ev0Config.isFluidTransferEnabled() && targetFluidId != 0 && currentItem == null && !hasContainer) {
@@ -776,7 +821,49 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
     private boolean tryTransferToOrFromContainer(Object state, Vector3i pos, AdjacentSide side,
                                                  Store<EntityStore> entities, boolean exportPhase) {
         //HytaleLogger.getLogger().atInfo().log("tryTransferToOrFromContainer: side=" + side + " exportPhase=" + exportPhase + " state=" + (state == null ? "null" : state.getClass().getSimpleName()));
-        if (state == null || (!(state != null && state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState")) && !state.getClass().getSimpleName().contains("ItemContainer")))
+        // ECS fallback: if state is null, the target may be an ECS-only component (e.g. FertilizerState)
+        if (state == null) {
+            ItemContainer ecsContainer = getContainerViaECS(pos);
+            if (ecsContainer == null) return false;
+            if (!exportPhase) {
+                for (int slot = 0; slot < ecsContainer.getCapacity(); slot++) {
+                    ItemStack stack = ecsContainer.getItemStack((short) slot);
+                    if (stack == null) continue;
+                    String probeKey = null;
+                    try { probeKey = stack.getBlockKey(); } catch (Throwable ignored) {}
+                    if (probeKey == null) probeKey = resolveItemStackKey(stack);
+                    if (!isItemAllowedByFilter(probeKey)) continue;
+                    int srcAvailable = stack.getQuantity();
+                    if (isSingletonMode() && srcAvailable <= 1) continue;
+                    int transferAmount = isSingletonMode() && srcAvailable < data.tier * Ev0Config.getTierMultiplier() ? srcAvailable - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), srcAvailable);
+                    if (transferAmount <= 0) continue;
+                    ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, stack.withQuantity(transferAmount));
+                    if (t.succeeded()) {
+                        ecsContainer.removeItemStackFromSlot((short) slot, transferAmount);
+                        return true;
+                    }
+                }
+            }
+            if (exportPhase) {
+                ItemStack have = this.getItemContainer().getItemStack((short) 0);
+                if (have != null && have.getQuantity() > 0) {
+                    int haveQty = have.getQuantity();
+                    if (isSingletonMode() && haveQty <= 1) return false;
+                    int transferAmount = isSingletonMode() && haveQty < data.tier * Ev0Config.getTierMultiplier() ? haveQty - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), haveQty);
+                    ItemStack safeStack = have.withQuantity(transferAmount);
+                    for (int slot = 0; slot < ecsContainer.getCapacity(); slot++) {
+                        ItemStackSlotTransaction t = ecsContainer.addItemStackToSlot((short) slot, safeStack);
+                        if (t.succeeded()) {
+                            spawnVisualFor(safeStack, exportPhase, pos, side, entities);
+                            this.getItemContainer().removeItemStackFromSlot((short) 0, transferAmount);
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+        if (!state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") && !state.getClass().getSimpleName().contains("ItemContainer") && getItemContainerFromState(state) == null)
             return false;
 
         boolean isProcessingBench = (state != null && state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState"));
@@ -800,7 +887,9 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                     if (!isItemAllowedByFilter(probeKeyPb)) {
                         continue;
                     }
-                    int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
+                    int pbAvailable = stack.getQuantity();
+                    if (isSingletonMode() && pbAvailable <= 1) continue;
+                    int transferAmount = isSingletonMode() && pbAvailable < data.tier * Ev0Config.getTierMultiplier() ? pbAvailable - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), pbAvailable);
                     if (transferAmount <= 0) continue;
                     ItemStack safeStack = stack.withQuantity(transferAmount);
                     ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, safeStack);
@@ -813,7 +902,10 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                 // Export phase: push from hopper into input containers 0 and 1
                 ItemStack have = this.getItemContainer().getItemStack((short) 0);
                 if (have != null && have.getQuantity() > 0) {
-                    int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), have.getQuantity());
+                    int haveQty = have.getQuantity();
+                    if (isSingletonMode() && haveQty <= 1) return false;
+                    int transferAmount = isSingletonMode() && haveQty < data.tier * Ev0Config.getTierMultiplier() ? haveQty - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), haveQty);
+                    if (transferAmount <= 0) return false;
                     ItemStack safeStack = have.withQuantity(transferAmount);
                     for (int c = 0; c <= 1; c++) {
                         ItemContainer input = getContainerFromItemContainerObject(getItemContainerFromState(bench), c);
@@ -852,7 +944,8 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                     try { probeKey = slotItem.getBlockKey(); } catch (Throwable ignored) {}
                     if (probeKey == null) probeKey = resolveItemStackKey(slotItem);
                     if (!isItemAllowedByFilter(probeKey)) continue;
-                    int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), slotQty);
+                    if (isSingletonMode() && slotQty <= 1) continue;
+                    int transferAmount = isSingletonMode() && slotQty < data.tier * Ev0Config.getTierMultiplier() ? slotQty - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), slotQty);
                     if (transferAmount <= 0) continue;
                     ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, slotItem.withQuantity(transferAmount));
                     if (t.succeeded()) {
@@ -871,7 +964,9 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                 // Export: push from hopper into drawer using only IDrawerContainer interface methods.
                 ItemStack have = this.getItemContainer().getItemStack((short) 0);
                 if (have != null && have.getQuantity() > 0) {
-                    int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), have.getQuantity());
+                    int haveQty = have.getQuantity();
+                    if (isSingletonMode() && haveQty <= 1) return false;
+                    int transferAmount = isSingletonMode() && haveQty < data.tier * Ev0Config.getTierMultiplier() ? haveQty - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), haveQty);
 
                     // Pass 1: prefer an existing slot whose locked type matches the incoming item.
                     short matchedSlot = -1;
@@ -941,7 +1036,9 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                 if (!isItemAllowedByFilter(probeKey)) {
                     continue;
                 }
-                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), stack.getQuantity());
+                int srcAvailable = stack.getQuantity();
+                if (isSingletonMode() && srcAvailable <= 1) continue;
+                int transferAmount = isSingletonMode() && srcAvailable < data.tier * Ev0Config.getTierMultiplier() ? srcAvailable - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), srcAvailable);
                 if (transferAmount <= 0) continue;
                 ItemStack safeStack = stack.withQuantity(transferAmount);
                 ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, safeStack);
@@ -956,7 +1053,9 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
         if (exportPhase) {
             ItemStack have = this.getItemContainer().getItemStack((short) 0);
             if (have != null && have.getQuantity() > 0) {
-            int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), have.getQuantity());
+            int haveQty = have.getQuantity();
+            if (isSingletonMode() && haveQty <= 1) return false;
+            int transferAmount = isSingletonMode() && haveQty < data.tier * Ev0Config.getTierMultiplier() ? haveQty - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), haveQty);
             ItemStack safeStack = have.withQuantity(transferAmount);
             for (int slot = 0; slot < container.getCapacity(); slot++) {
                 ItemStackSlotTransaction t = container.addItemStackToSlot((short) slot, safeStack);
@@ -1069,7 +1168,7 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
 
             Object state = org.Ev0Mods.plugin.api.component.EngineCompat.getState(chunk, exportPos.x, exportPos.y, exportPos.z);
             int targetFluidId = org.Ev0Mods.plugin.api.component.EngineCompat.getFluidId(chunk, exportPos.x, exportPos.y, exportPos.z);
-            boolean hasContainer = (state != null && (state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") || state.getClass().getSimpleName().contains("ItemContainer")));
+            boolean hasContainer = (state != null && (state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") || state.getClass().getSimpleName().contains("ItemContainer") || getItemContainerFromState(state) != null)) || (state == null && getContainerViaECS(exportPos) != null);
             ItemStack currentItem = this.getItemContainer().getItemStack((short) 0);
 
             if (Ev0Config.isFluidTransferEnabled() && currentItem != null && !hasContainer && targetFluidId != 0) {
@@ -1093,6 +1192,7 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
             boolean transferred = tryTransferToOrFromContainer(state, exportPos, side, entities, true);
 
             if (!transferred && currentItem != null && !hasContainer && targetFluidId == 0) {
+                if (isSingletonMode() && currentItem.getQuantity() <= 1) continue;
                 if (org.Ev0Mods.plugin.api.component.EngineCompat.getBlockType(chunk, exportPos.x, exportPos.y, exportPos.z) == null) {
                     org.Ev0Mods.plugin.api.component.EngineCompat.setBlock(chunk, exportPos.x, exportPos.y, exportPos.z, currentItem.getBlockKey());
                     this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
@@ -1108,7 +1208,9 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
         ItemStack source = this.getItemContainer().getItemStack((short) 0);
         if (source == null) return false;
 
-        int transferAmount = (int) Math.min(data.tier * 2, source.getQuantity());
+        int srcQty = source.getQuantity();
+        if (isSingletonMode() && srcQty <= 1) return false;
+        int transferAmount = isSingletonMode() && srcQty < data.tier * 2 ? srcQty - 1 : (int) Math.min(data.tier * 2, srcQty);
         if (transferAmount <= 0) return false;
 
         Vector3i basePos = this.getBlockPosition();
@@ -1151,7 +1253,9 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
             ItemStack sourcex = this.getItemContainer().getItemStack((short) 0);
             if (sourcex == null) return false;
 
-            int transferAmount = (int) Math.min(data.tier * 2, sourcex.getQuantity());
+            int srcxQty = sourcex.getQuantity();
+            if (isSingletonMode() && srcxQty <= 1) return false;
+            int transferAmount = isSingletonMode() && srcxQty < data.tier * 2 ? srcxQty - 1 : (int) Math.min(data.tier * 2, srcxQty);
             if (transferAmount <= 0) return false;
 
             ItemStack safeStack = sourcex.withQuantity(transferAmount);
@@ -1336,7 +1440,7 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                 int available = stack.getQuantity();
                 // Singleton mode: leave at least 1 item in the source slot so auto-refill mods keep working
                 if (isSingletonMode() && available <= 1) continue;
-                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), isSingletonMode() ? available - 1 : available);
+                int transferAmount = isSingletonMode() && available < data.tier * Ev0Config.getTierMultiplier() ? available - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), available);
                 if (transferAmount <= 0) continue;
 
                 ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, stack.withQuantity(transferAmount));
@@ -1389,7 +1493,7 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                 int otherAvailable = otherStack.getQuantity();
                 // Singleton mode: leave at least 1 item in the other hopper's slot
                 if (isSingletonMode() && otherAvailable <= 1) continue;
-                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), isSingletonMode() ? otherAvailable - 1 : otherAvailable);
+                int transferAmount = isSingletonMode() && otherAvailable < data.tier * Ev0Config.getTierMultiplier() ? otherAvailable - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), otherAvailable);
                 if (transferAmount <= 0) continue;
 
                 ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, otherStack.withQuantity(transferAmount));
@@ -1433,7 +1537,30 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
             java.lang.reflect.Method m = state.getClass().getMethod("getItemContainer");
             containerStateObj = m.invoke(state);
         } catch (Throwable ignored) {}
-        if (containerStateObj == null) return false;
+        if (containerStateObj == null) {
+            // ECS fallback: try to find a container via ECS component lookup
+            ItemContainer ecsContainer = getContainerViaECS(pos);
+            if (ecsContainer != null) {
+                for (int slot = 0; slot < ecsContainer.getCapacity(); slot++) {
+                    ItemStack stack = ecsContainer.getItemStack((short) slot);
+                    if (stack == null) continue;
+                    String probeKey = null;
+                    try { probeKey = stack.getBlockKey(); } catch (Throwable ignored) {}
+                    if (probeKey == null) probeKey = resolveItemStackKey(stack);
+                    if (!isItemAllowedByFilter(probeKey)) continue;
+                    int srcAvailable = stack.getQuantity();
+                    if (isSingletonMode() && srcAvailable <= 1) continue;
+                    int transferAmount = isSingletonMode() && srcAvailable < data.tier * Ev0Config.getTierMultiplier() ? srcAvailable - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), srcAvailable);
+                    if (transferAmount <= 0) continue;
+                    ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, stack.withQuantity(transferAmount));
+                    if (t.succeeded()) {
+                        ecsContainer.removeItemStackFromSlot((short) slot, transferAmount);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
         ItemContainer sourceContainer = (ItemContainer) containerStateObj;
 
         // Simple Drawers: use the IDrawerContainer API so we read the actual slot quantity
@@ -1449,7 +1576,7 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                 if (!isItemAllowedByFilter(probeKey2)) continue;
                 // Singleton mode: leave at least 1 item in the drawer slot
                 if (isSingletonMode() && slotQty <= 1) continue;
-                int transferAmount = (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), isSingletonMode() ? slotQty - 1 : slotQty);
+                int transferAmount = isSingletonMode() && slotQty < data.tier * Ev0Config.getTierMultiplier() ? slotQty - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), slotQty);
                 if (transferAmount <= 0) continue;
                 ItemStack safeStack = slotItem.withQuantity(transferAmount);
                 ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, safeStack);
@@ -1501,7 +1628,7 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
             // Singleton mode: leave at least 1 item in each source slot
             if (isSingletonMode() && srcAvailable <= 1) continue;
             int transferAmount =
-                (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), isSingletonMode() ? srcAvailable - 1 : srcAvailable);
+                isSingletonMode() && srcAvailable < data.tier * Ev0Config.getTierMultiplier() ? srcAvailable - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), srcAvailable);
             if (transferAmount <= 0) continue;
 
             ItemStack safeStack = stack.withQuantity(transferAmount);
