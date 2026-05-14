@@ -1,173 +1,127 @@
+/*
+ * Decompiled with CFR 0.152.
+ */
 package org.Ev0Mods.plugin.api;
 
 import com.hypixel.hytale.logger.HytaleLogger;
-
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.FileAttribute;
 import java.util.Properties;
+import org.Ev0Mods.plugin.api.Ev0Log;
 
-/**
- * Global configuration for Ev0Lib mod
- * Values are loaded from config.properties in the server config directory
- * Server managers can edit this file to enable/disable features
- */
 public class Ev0Config {
-
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private static final String CONFIG_FILE_NAME = "Ev0Lib_config.properties";
-
-    // Default values
-    private static int tierMultiplier = 4; // Default value - transfers tier * 4 items per tick
-    private static boolean fluidTransferEnabled = true; // Enable/disable fluid import/export
-    private static boolean debugMode = false; // Enable debug logging (used as master logging switch)
-
-    // Config file path (set by plugin)
+    private static int tierMultiplier = 4;
+    private static boolean fluidTransferEnabled = true;
+    private static boolean debugMode = false;
     private static Path configFilePath = null;
     private static boolean initialized = false;
 
-    public Ev0Config() {}
-
-    /**
-     * Initialize the config system - called by the plugin on startup
-     * @param configDirPath Path to the server's config directory
-     */
     public static void initialize(String configDirPath) {
         if (initialized) {
             Ev0Log.warn(LOGGER, "Ev0Config already initialized!");
             return;
         }
-
         configFilePath = Paths.get(configDirPath, CONFIG_FILE_NAME);
-        loadConfig();
+        Ev0Config.loadConfig();
         initialized = true;
-        Ev0Log.info(LOGGER, "Ev0Config initialized from: " + configFilePath.toAbsolutePath());
+        Ev0Log.info(LOGGER, "Ev0Config initialized from: " + String.valueOf(configFilePath.toAbsolutePath()));
     }
 
-    /**
-     * Load config from file, or create default if not exists
-     */
     private static void loadConfig() {
-        Properties props = new Properties();
-
-        try {
-            if (Files.exists(configFilePath)) {
-                // Load existing config
-                try (InputStream input = Files.newInputStream(configFilePath)) {
-                    props.load(input);
-                    loadValuesFromProperties(props);
-                    Ev0Log.info(LOGGER, "Loaded config from: " + configFilePath);
+        block9: {
+            Properties props = new Properties();
+            try {
+                if (Files.exists(configFilePath, new LinkOption[0])) {
+                    try (InputStream input = Files.newInputStream(configFilePath, new OpenOption[0]);){
+                        props.load(input);
+                        Ev0Config.loadValuesFromProperties(props);
+                        Ev0Log.info(LOGGER, "Loaded config from: " + String.valueOf(configFilePath));
+                        break block9;
+                    }
                 }
-            } else {
-                // Create default config file
-                saveDefaultConfig(props);
-                Ev0Log.info(LOGGER, "Created default config at: " + configFilePath);
+                Ev0Config.saveDefaultConfig(props);
+                Ev0Log.info(LOGGER, "Created default config at: " + String.valueOf(configFilePath));
             }
-        } catch (Exception e) {
-            Ev0Log.warn(LOGGER, "Error loading config: " + e.getMessage());
-            // Use defaults on error
+            catch (Exception e) {
+                Ev0Log.warn(LOGGER, "Error loading config: " + e.getMessage());
+            }
         }
     }
 
-    /**
-     * Load values from Properties
-     */
     private static void loadValuesFromProperties(Properties props) {
-        // Tier Multiplier
+        String debug;
+        String fluidTransfer;
         String tierMult = props.getProperty("tierMultiplier");
         if (tierMult != null) {
             try {
                 tierMultiplier = Integer.parseInt(tierMult.trim());
-            } catch (NumberFormatException e) {
+            }
+            catch (NumberFormatException e) {
                 Ev0Log.warn(LOGGER, "Invalid tierMultiplier value, using default: " + tierMult);
             }
         }
-
-        // Fluid Transfer
-        String fluidTransfer = props.getProperty("fluidTransferEnabled");
-        if (fluidTransfer != null) {
+        if ((fluidTransfer = props.getProperty("fluidTransferEnabled")) != null) {
             fluidTransferEnabled = Boolean.parseBoolean(fluidTransfer.trim());
         }
-
-        // Debug Mode
-        String debug = props.getProperty("debugMode");
-        if (debug != null) {
+        if ((debug = props.getProperty("debugMode")) != null) {
             debugMode = Boolean.parseBoolean(debug.trim());
         }
-
-        // Master Logging uses debugMode (no separate enableLogging property)
     }
 
-    /**
-     * Save the default config file
-     */
     private static void saveDefaultConfig(Properties props) {
         props.setProperty("tierMultiplier", String.valueOf(tierMultiplier));
         props.setProperty("fluidTransferEnabled", String.valueOf(fluidTransferEnabled));
         props.setProperty("debugMode", String.valueOf(debugMode));
-
         try {
-            // Ensure parent directory exists
             if (configFilePath.getParent() != null) {
-                Files.createDirectories(configFilePath.getParent());
+                Files.createDirectories(configFilePath.getParent(), new FileAttribute[0]);
             }
-            try (OutputStream output = Files.newOutputStream(configFilePath)) {
-                props.store(output, "Ev0Lib Configuration File\n" +
-                    "# Edit these values to enable/disable features\n" +
-                    "# tierMultiplier: How many items per tier to transfer per tick (default: 4)\n" +
-                    "# fluidTransferEnabled: Enable/disable fluid import/export via hoppers (default: true)\n" +
-                    "# debugMode: Enable debug logging (default: false)\n" +
-                    "# enableLogging: Master switch for all Ev0Lib logging (default: false)");
+            try (OutputStream output = Files.newOutputStream(configFilePath, new OpenOption[0]);){
+                props.store(output, "Ev0Lib Configuration File\n# Edit these values to enable/disable features\n# tierMultiplier: How many items per tier to transfer per tick (default: 4)\n# fluidTransferEnabled: Enable/disable fluid import/export via hoppers (default: true)\n# debugMode: Enable debug logging (default: false)\n# enableLogging: Master switch for all Ev0Lib logging (default: false)");
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             Ev0Log.warn(LOGGER, "Error saving default config: " + e.getMessage());
         }
     }
 
-    /**
-     * Reload config from file (can be called at runtime)
-     */
     public static void reload() {
         if (!initialized) {
             Ev0Log.warn(LOGGER, "Ev0Config not initialized, cannot reload!");
             return;
         }
-
-        loadConfig();
+        Ev0Config.loadConfig();
         Ev0Log.info(LOGGER, "Ev0Config reloaded");
     }
 
-    /**
-     * Save current values to config file
-     */
     public static void save() {
         if (!initialized) {
             Ev0Log.warn(LOGGER, "Ev0Config not initialized, cannot save!");
             return;
         }
-
         Properties props = new Properties();
         props.setProperty("tierMultiplier", String.valueOf(tierMultiplier));
         props.setProperty("fluidTransferEnabled", String.valueOf(fluidTransferEnabled));
         props.setProperty("debugMode", String.valueOf(debugMode));
-
         try {
-            try (OutputStream output = Files.newOutputStream(configFilePath)) {
-                props.store(output, "Ev0Lib Configuration File\n" +
-                    "# Edit these values to enable/disable features\n" +
-                    "# tierMultiplier: How many items per tier to transfer per tick (default: 4)\n" +
-                    "# fluidTransferEnabled: Enable/disable fluid import/export via hoppers (default: true)\n" +
-                    "# debugMode: Enable debug logging (default: false)\n" +
-                    "# enableLogging: Master switch for all Ev0Lib logging (default: false)");
+            try (OutputStream output = Files.newOutputStream(configFilePath, new OpenOption[0]);){
+                props.store(output, "Ev0Lib Configuration File\n# Edit these values to enable/disable features\n# tierMultiplier: How many items per tier to transfer per tick (default: 4)\n# fluidTransferEnabled: Enable/disable fluid import/export via hoppers (default: true)\n# debugMode: Enable debug logging (default: false)\n# enableLogging: Master switch for all Ev0Lib logging (default: false)");
             }
             Ev0Log.info(LOGGER, "Ev0Config saved");
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             Ev0Log.warn(LOGGER, "Error saving config: " + e.getMessage());
         }
     }
-
-    // Getters
 
     public static int getTierMultiplier() {
         return tierMultiplier;
@@ -185,25 +139,29 @@ public class Ev0Config {
         return debugMode;
     }
 
-    // Setters with save
-
     public static void setTierMultiplier(int value) {
         tierMultiplier = value;
-        if (initialized) save();
+        if (initialized) {
+            Ev0Config.save();
+        }
     }
 
     public static void setFluidTransferEnabled(boolean enabled) {
         fluidTransferEnabled = enabled;
-        if (initialized) save();
+        if (initialized) {
+            Ev0Config.save();
+        }
     }
 
     public static void setDebugMode(boolean enabled) {
         debugMode = enabled;
-        if (initialized) save();
+        if (initialized) {
+            Ev0Config.save();
+        }
     }
 
     public static void setLoggingEnabled(boolean enabled) {
-        // Backwards-compatible setter: toggle debugMode when callers set loggingEnabled
-        setDebugMode(enabled);
+        Ev0Config.setDebugMode(enabled);
     }
 }
+

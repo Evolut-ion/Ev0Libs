@@ -1,27 +1,31 @@
+/*
+ * Decompiled with CFR 0.152.
+ */
 package org.Ev0Mods.plugin.api.codec;
 
 import com.hypixel.hytale.codec.lookup.CodecMapCodec;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
 public interface ItemHandler {
-    CodecMapCodec<ItemHandler> CODEC = new CodecMapCodec<>("Type");
+    public static final CodecMapCodec<ItemHandler> CODEC = new CodecMapCodec("Type");
 
-    void output(Consumer<ItemStack> consumer);
+    public void output(Consumer<ItemStack> var1);
 
-    void input(Consumer <ItemStack> inputConsumer);
+    public void input(Consumer<ItemStack> var1);
 
-    default List<ItemStack> outputList() {
-        final List<ItemStack> output = new ArrayList<>();
+    default public List<ItemStack> outputList() {
+        ArrayList<ItemStack> output = new ArrayList<ItemStack>();
         this.output(output::add);
         return output;
     }
-    default List<ItemStack> inputList() {
-        final List<ItemStack> input = new ArrayList<>();
+
+    default public List<ItemStack> inputList() {
+        ArrayList<ItemStack> input = new ArrayList<ItemStack>();
         this.input(input::add);
         return input;
     }
 }
+

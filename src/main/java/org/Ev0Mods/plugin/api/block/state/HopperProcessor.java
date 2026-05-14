@@ -1,169 +1,115 @@
+/*
+ * Decompiled with CFR 0.152.
+ * 
+ * Could not load the following classes:
+ *  com.hypixel.hytale.math.vector.Vector3d
+ *  com.hypixel.hytale.math.vector.Vector3f
+ */
 package org.Ev0Mods.plugin.api.block.state;
 
-
-import au.ellie.hyui.builders.HudBuilder;
-import au.ellie.hyui.builders.HyUIAnchor;
-import au.ellie.hyui.builders.LabelBuilder;
 import com.hypixel.hytale.builtin.blocktick.system.ChunkBlockTickSystem;
-import com.hypixel.hytale.builtin.fluid.FluidPlugin;
-import com.hypixel.hytale.builtin.fluid.FluidState;
 import com.hypixel.hytale.builtin.fluid.FluidSystems;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
-import com.hypixel.hytale.common.thread.ticking.Tickable;
-import com.hypixel.hytale.component.*;
+import com.hypixel.hytale.component.AddReason;
+import com.hypixel.hytale.component.ArchetypeChunk;
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.ComponentAccessor;
+import com.hypixel.hytale.component.ComponentRegistryProxy;
+import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.Holder;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.RemoveReason;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.dependency.Dependency;
 import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.spatial.SpatialResource;
 import com.hypixel.hytale.logger.HytaleLogger;
-import org.Ev0Mods.plugin.api.Ev0Log;
-import com.hypixel.hytale.math.shape.Box;
 import com.hypixel.hytale.math.util.ChunkUtil;
-import com.hypixel.hytale.math.util.HashUtil;
-import com.hypixel.hytale.math.vector.Vector2i;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
 import com.hypixel.hytale.math.vector.Vector3i;
 import com.hypixel.hytale.protocol.BlockPosition;
-import com.hypixel.hytale.protocol.ChangeVelocityType;
-import com.hypixel.hytale.protocol.ItemResourceType;
 import com.hypixel.hytale.protocol.Rangef;
-import com.hypixel.hytale.server.core.HytaleServer;
-import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
-import com.hypixel.hytale.server.core.asset.type.blocktick.BlockTickStrategy;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.StateData;
 import com.hypixel.hytale.server.core.asset.type.fluid.Fluid;
-import com.hypixel.hytale.server.core.asset.type.fluid.FluidTicker;
-import com.hypixel.hytale.server.core.asset.type.item.config.Item;
-import com.hypixel.hytale.server.core.asset.type.item.config.ItemDrop;
-import com.hypixel.hytale.server.core.asset.type.model.config.Model;
 import com.hypixel.hytale.server.core.codec.ProtocolCodecs;
-import com.hypixel.hytale.server.core.entity.Entity;
-import com.hypixel.hytale.server.core.entity.EntityUtils;
-import com.hypixel.hytale.server.core.entity.ItemUtils;
 import com.hypixel.hytale.server.core.entity.entities.BlockEntity;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
 import com.hypixel.hytale.server.core.inventory.transaction.ItemStackSlotTransaction;
-import com.hypixel.hytale.server.core.inventory.transaction.Transaction;
-import com.hypixel.hytale.server.core.modules.collision.CollisionModule;
-import com.hypixel.hytale.server.core.modules.collision.CollisionResult;
 import com.hypixel.hytale.server.core.modules.entity.EntityModule;
 import com.hypixel.hytale.server.core.modules.entity.component.BoundingBox;
 import com.hypixel.hytale.server.core.modules.entity.component.Intangible;
-import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
-import com.hypixel.hytale.server.core.modules.entity.item.PickupItemComponent;
-import com.hypixel.hytale.server.core.modules.entity.item.PreventItemMerging;
-import com.hypixel.hytale.server.core.modules.entity.system.ItemSpatialSystem;
-import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
 import com.hypixel.hytale.server.core.modules.physics.component.PhysicsValues;
 import com.hypixel.hytale.server.core.modules.physics.component.Velocity;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.chunk.BlockChunk;
 import com.hypixel.hytale.server.core.universe.world.chunk.BlockComponentChunk;
-import voidbond.arcio.ArcioPlugin;
-import voidbond.arcio.components.ArcioMechanismComponent;
-import voidbond.arcio.components.BlockUUIDComponent;
-import com.hypixel.hytale.server.core.universe.world.chunk.ChunkColumn;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
-import com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection;
 import com.hypixel.hytale.server.core.universe.world.chunk.section.ChunkSection;
 import com.hypixel.hytale.server.core.universe.world.chunk.section.FluidSection;
 import com.hypixel.hytale.server.core.universe.world.chunk.state.TickableBlockState;
-import com.hypixel.hytale.server.core.universe.world.connectedblocks.ConnectedBlockPatternRule.AdjacentSide;
+import com.hypixel.hytale.server.core.universe.world.connectedblocks.ConnectedBlockPatternRule;
 import com.hypixel.hytale.server.core.universe.world.meta.state.ItemContainerBlockState;
-// Engine types removed in prerelease: use runtime reflection/name-checks instead
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.core.util.FillerBlockUtil;
-import com.hypixel.hytale.server.worldgen.util.BlockFluidEntry;
-import com.nimbusds.jose.util.Container;
-//import dev.dukedarius.HytaleIndustries.BlockStates.ItemPipeBlockState;
-//import dev.dukedarius.HytaleIndustries.HytaleIndustriesPlugin;
-import it.unimi.dsi.fastutil.objects.ObjectList;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import net.crepe.inventory.IDrawerContainer;
 import org.Ev0Mods.plugin.Ev0Lib;
+import org.Ev0Mods.plugin.api.Ev0Config;
+import org.Ev0Mods.plugin.api.Ev0Log;
 import org.Ev0Mods.plugin.api.codec.Codecs;
 import org.Ev0Mods.plugin.api.codec.IdOutput;
 import org.Ev0Mods.plugin.api.codec.ItemHandler;
-import org.Ev0Mods.plugin.api.component.FluidComponent;
-import net.crepe.inventory.IDrawerContainer;
-import org.Ev0Mods.plugin.api.system.LiquidPlacingSystem;
-import org.Ev0Mods.plugin.api.util.EntityHelper;
+import org.Ev0Mods.plugin.api.component.EngineCompat;
+import org.Ev0Mods.plugin.api.component.HopperComponent;
+import org.Ev0Mods.plugin.api.system.WirelessHopperPlaceSystem;
+import org.Ev0Mods.plugin.api.ui.HopperUIPage;
 import org.Ev0Mods.plugin.api.util.ItemUtilsExtended;
 import org.Ev0Mods.plugin.api.util.WorldHelper;
-import org.Ev0Mods.plugin.api.Ev0Config;
-import org.Ev0Mods.plugin.api.component.HopperComponent;
-import au.ellie.hyui.builders.PageBuilder;
 import org.checkerframework.checker.nullness.compatqual.NonNullDecl;
+import org.joml.Vector3ic;
+import voidbond.arcio.ArcioPlugin;
+import voidbond.arcio.components.ArcioMechanismComponent;
+import voidbond.arcio.components.BlockUUIDComponent;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.lang.reflect.Method;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
-import java.util.function.ToIntFunction;
-import java.util.logging.Level;
-
-import static com.hypixel.hytale.builtin.fluid.FluidSystems.*;
-import static org.bouncycastle.asn1.x500.style.BCStyle.T;
-
-
-@SuppressWarnings("removal")
-
-public class HopperProcessor implements TickableBlockState, ItemContainerBlockState{
-    // Performance tuning: toggle debug logging for hopper internals
+public class HopperProcessor
+implements TickableBlockState,
+ItemContainerBlockState {
     private static final boolean PERF_DEBUG = false;
-
-    private static void perfInfo(String msg) {
-        if (PERF_DEBUG) Ev0Log.info(HytaleLogger.getLogger(), msg);
-    }
     public int fluid_id = 0;
-    public Rangef duration = new Rangef(0, 10);
+    public Rangef duration = new Rangef(0.0f, 10.0f);
     public float tier;
-    public static final BuilderCodec<HopperProcessor> CODEC = BuilderCodec.builder(HopperProcessor.class, HopperProcessor::new)
-            .append(new KeyedCodec<>("StartTime", Codec.INSTANT, true), (i, v) -> i.startTime = v, i -> i.startTime).add()
-            .append(new KeyedCodec<>("Tier", Codec.FLOAT, true), (i, v) -> i.tier = v, i -> i.tier).add()
-            .append(new KeyedCodec<>("Substitutions", Codec.STRING_ARRAY, true), (i, v) -> i.substitutions = v, i -> i.substitutions).add()
-            .append(new KeyedCodec<>("Timer", Codec.DOUBLE, true), (i, v) -> i.timer = v, i -> i.timer).add()
-            // Persist filter mode and lists so UI state survives reloads
-            .append(new KeyedCodec<>("FilterMode", Codec.STRING, true), (i, v) -> i.filterMode = v == null ? "Off" : v, i -> i.filterMode).add()
-            .append(new KeyedCodec<>("Whitelist", Codec.STRING_ARRAY, true), (i, v) -> {
-                if (v == null) i.whitelist.clear(); else {
-                    i.whitelist.clear();
-                    i.whitelist.addAll(Arrays.asList(v));
-                }
-            }, i -> i.whitelist.toArray(new String[0])).add()
-            .append(new KeyedCodec<>("Blacklist", Codec.STRING_ARRAY, true), (i, v) -> {
-                if (v == null) i.blacklist.clear(); else {
-                    i.blacklist.clear();
-                    i.blacklist.addAll(Arrays.asList(v));
-                }
-            }, i -> i.blacklist.toArray(new String[0])).add()
-            .append(new KeyedCodec<>("ArcioMode", Codec.STRING, true), (i, v) -> i.arcioMode = v == null ? "IgnoreSignal" : v, i -> i.arcioMode).add()
-            .build();
+    public static final BuilderCodec<HopperProcessor> CODEC = BuilderCodec.builder(HopperProcessor.class, HopperProcessor::new).build();
     protected Instant startTime;
-    private double timerV = 0;
-    private double timer = 0;
+    private double timerV = 0.0;
+    private double timer = 0.0;
     protected short outputSlot = 0;
     private String[] substitutions;
     public Data data;
@@ -178,57 +124,43 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
     public Ref<EntityStore>[] ic;
     public Store<EntityStore> es;
     public List<Ref<EntityStore>> l = new ArrayList<Ref<EntityStore>>();
-    // Map to keep a reference from spawned visual entity -> the ItemStack it represents
-    public Map<Ref<EntityStore>, ItemStack> visualMap = new HashMap<>();
-    // Map to keep spawn time for each visual so we can explicitly remove them
-    public Map<Ref<EntityStore>, Instant> visualSpawnTimes = new HashMap<>();
+    public Map<Ref<EntityStore>, ItemStack> visualMap = new HashMap<Ref<EntityStore>, ItemStack>();
+    public Map<Ref<EntityStore>, Instant> visualSpawnTimes = new HashMap<Ref<EntityStore>, Instant>();
     private Fluid f;
     private int tickCounter = 0;
-    // Snapshotted once per tick so all visual-spawn calls share the same stable player list,
-    // avoiding the thread-local spatial list being cleared mid-tick by throwItem/addEntity internals.
-    private List<Ref<EntityStore>> nearbyBuffer = new ArrayList<>();
-    private static final ConcurrentHashMap<Class<?>, Method> ITEM_KEY_METHOD_CACHE = new ConcurrentHashMap<>();
-    // Cache for reflective accessors to avoid repeated lookups in hot path
-    private static final ConcurrentHashMap<Class<?>, Method> GET_ITEM_CONTAINER_METHOD_CACHE = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<Class<?>, Method> GET_CONTAINER_FROM_ITEM_CONTAINER_METHOD_CACHE = new ConcurrentHashMap<>();
-    // Reflection caches for archetype/ref/component helpers
-    private static final ConcurrentHashMap<String, Method> REFLECTION_METHOD_CACHE = new ConcurrentHashMap<>();
-    // Cached answer to "are any players nearby?" updated every 60 ticks to avoid
-    // running the player spatial query every tick for every hopper.
+    private int exportFaceCursor = 0;
+    private List<Ref<EntityStore>> nearbyBuffer = new ArrayList<Ref<EntityStore>>();
+    private static final ConcurrentHashMap<Class<?>, Method> ITEM_KEY_METHOD_CACHE = new ConcurrentHashMap();
+    private static final ConcurrentHashMap<Class<?>, Method> GET_ITEM_CONTAINER_METHOD_CACHE = new ConcurrentHashMap();
+    private static final ConcurrentHashMap<Class<?>, Method> GET_CONTAINER_FROM_ITEM_CONTAINER_METHOD_CACHE = new ConcurrentHashMap();
+    private static final ConcurrentHashMap<String, Method> REFLECTION_METHOD_CACHE = new ConcurrentHashMap();
     private boolean playersNearbyCached = false;
-    // Fluid blocks to remove on the next tick (deferred to avoid mutating the archetype chunk mid-tick)
-    private final List<long[]> pendingFluidRemovals = new ArrayList<>();
-
-    // Engine tick tracking for fallback
+    private final List<long[]> pendingFluidRemovals = new ArrayList<long[]>();
     private volatile long lastEngineTick = System.currentTimeMillis();
     private volatile boolean invalidatedFlag = false;
-
     private static final ScheduledExecutorService FALLBACK_SCHEDULER = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "ev0-hopper-fallback");
         t.setDaemon(true);
         return t;
     });
-
-    private static final ConcurrentHashMap<HopperProcessor, Boolean> REGISTERED_PROCESSORS = new ConcurrentHashMap<>();
-
-    static {
-        // Run a light maintenance task every 2 seconds to handle processors that the engine didn't tick.
-        FALLBACK_SCHEDULER.scheduleAtFixedRate(() -> {
-            long now = System.currentTimeMillis();
-            for (HopperProcessor hp : REGISTERED_PROCESSORS.keySet()) {
-                try {
-                    long last = hp.lastEngineTick;
-                    if (hp.invalidatedFlag) { REGISTERED_PROCESSORS.remove(hp); continue; }
-                    if (now - last > 2000) {
-                        try { hp.fallbackHeartbeat(); } catch (Throwable ignored) {}
-                    }
-                } catch (Throwable ignored) {}
-            }
-        }, 2, 2, TimeUnit.SECONDS);
-    }
-
-    // Local container storage to avoid depending on engine base state classes
+    private static final ConcurrentHashMap<HopperProcessor, Boolean> REGISTERED_PROCESSORS = new ConcurrentHashMap();
     private ItemContainer itemContainer;
+    private static volatile List<Object> KNOWN_CONTAINER_COMP_TYPES;
+    public static final boolean ARCIO_PRESENT;
+    public static final boolean SIMPLE_DRAWERS_PRESENT;
+    private boolean arcioInitialized = false;
+    private String arcioMode = "IgnoreSignal";
+    private final List<String> whitelist = Collections.synchronizedList(new ArrayList());
+    private final List<String> blacklist = Collections.synchronizedList(new ArrayList());
+    private volatile String filterMode = "Off";
+    private final Map<PlayerRef, String> typedBuffer = new ConcurrentHashMap<PlayerRef, String>();
+    @Nonnull
+    private static final Query<ChunkStore> QUERY;
+    @Nonnull
+    private static final Set<Dependency<ChunkStore>> DEPENDENCIES;
+
+    private static void perfInfo(String msg) {
+    }
 
     public ItemContainer getItemContainer() {
         return this.itemContainer;
@@ -238,119 +170,183 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
         this.itemContainer = c;
     }
 
-    // Reflection helpers to avoid compile-time dependency on engine state classes
     private Object getItemContainerFromState(Object stateObj) {
-        if (stateObj == null) return null;
+        if (stateObj == null) {
+            return null;
+        }
         Class<?> cls = stateObj.getClass();
         if (GET_ITEM_CONTAINER_METHOD_CACHE.containsKey(cls)) {
             Method cached = GET_ITEM_CONTAINER_METHOD_CACHE.get(cls);
-            if (cached == null) return null;
-            try { return cached.invoke(stateObj); } catch (Throwable ignored) { return null; }
+            if (cached == null) {
+                return null;
+            }
+            try {
+                return cached.invoke(stateObj, new Object[0]);
+            }
+            catch (Throwable ignored) {
+                return null;
+            }
         }
-
         Method found = null;
         try {
-            found = cls.getMethod("getItemContainer");
-        } catch (Throwable ignored) {}
-        if (found == null) {
-            try { found = cls.getMethod("itemContainer"); } catch (Throwable ignored) {}
+            found = cls.getMethod("getItemContainer", new Class[0]);
         }
-        // Cache even null to avoid repeated lookups
+        catch (Throwable ignored) {
+            // empty catch block
+        }
+        if (found == null) {
+            try {
+                found = cls.getMethod("itemContainer", new Class[0]);
+            }
+            catch (Throwable ignored) {
+                // empty catch block
+            }
+        }
         GET_ITEM_CONTAINER_METHOD_CACHE.put(cls, found);
-        if (found == null) return null;
-        try { return found.invoke(stateObj); } catch (Throwable ignored) { return null; }
+        if (found == null) {
+            return null;
+        }
+        try {
+            return found.invoke(stateObj, new Object[0]);
+        }
+        catch (Throwable ignored) {
+            return null;
+        }
     }
 
     private ItemContainer getContainerFromItemContainerObject(Object itemContainerObj, int idx) {
-        if (itemContainerObj == null) return null;
-        if (itemContainerObj instanceof ItemContainer) return (ItemContainer) itemContainerObj;
+        Object r;
+        if (itemContainerObj == null) {
+            return null;
+        }
+        if (itemContainerObj instanceof ItemContainer) {
+            return (ItemContainer)itemContainerObj;
+        }
         Class<?> cls = itemContainerObj.getClass();
         if (GET_CONTAINER_FROM_ITEM_CONTAINER_METHOD_CACHE.containsKey(cls)) {
             Method cached = GET_CONTAINER_FROM_ITEM_CONTAINER_METHOD_CACHE.get(cls);
-            if (cached == null) return null;
+            if (cached == null) {
+                return null;
+            }
             try {
-                Object r = cached.invoke(itemContainerObj, idx);
-                if (r instanceof ItemContainer) return (ItemContainer) r;
-            } catch (Throwable ignored) { return null; }
+                r = cached.invoke(itemContainerObj, idx);
+                if (r instanceof ItemContainer) {
+                    return (ItemContainer)r;
+                }
+            }
+            catch (Throwable ignored) {
+                return null;
+            }
         }
-
         Method found = null;
-        try { found = cls.getMethod("getContainer", int.class); } catch (Throwable ignored) {}
+        try {
+            found = cls.getMethod("getContainer", Integer.TYPE);
+        }
+        catch (Throwable ignored) {
+            // empty catch block
+        }
         if (found == null) {
-            try { found = cls.getMethod("container", int.class); } catch (Throwable ignored) {}
+            try {
+                found = cls.getMethod("container", Integer.TYPE);
+            }
+            catch (Throwable ignored) {
+                // empty catch block
+            }
         }
         GET_CONTAINER_FROM_ITEM_CONTAINER_METHOD_CACHE.put(cls, found);
-        if (found == null) return null;
+        if (found == null) {
+            return null;
+        }
         try {
-            Object r = found.invoke(itemContainerObj, idx);
-            if (r instanceof ItemContainer) return (ItemContainer) r;
-        } catch (Throwable ignored) {}
+            r = found.invoke(itemContainerObj, idx);
+            if (r instanceof ItemContainer) {
+                return (ItemContainer)r;
+            }
+        }
+        catch (Throwable throwable) {
+            // empty catch block
+        }
         return null;
     }
 
-    // ── ECS component-based container discovery ──────────────────────
-    // Lazy-discovered ComponentTypes from plugins that expose getItemContainer().
-    // Enables the hopper to interact with ECS-only block components
-    // (e.g. FertilizerState) that aren't visible via the legacy chunk.getState() API.
-    private static volatile List<Object> KNOWN_CONTAINER_COMP_TYPES = null;
-
     private static List<Object> getKnownContainerComponentTypes() {
-        if (KNOWN_CONTAINER_COMP_TYPES != null) return KNOWN_CONTAINER_COMP_TYPES;
-        List<Object> types = new ArrayList<>();
+        if (KNOWN_CONTAINER_COMP_TYPES != null) {
+            return KNOWN_CONTAINER_COMP_TYPES;
+        }
+        ArrayList<Object> types = new ArrayList<Object>();
         try {
             Class<?> cls = Class.forName("com.Ev0sMods.Ev0sWoodCutter.blockstates.FertilizerState");
-            java.lang.reflect.Field f = cls.getField("COMPONENT_TYPE");
+            Field f = cls.getField("COMPONENT_TYPE");
             Object ct = f.get(null);
-            if (ct != null) types.add(ct);
-        } catch (Throwable ignored) {}
+            if (ct != null) {
+                types.add(ct);
+            }
+        }
+        catch (Throwable throwable) {
+            // empty catch block
+        }
         KNOWN_CONTAINER_COMP_TYPES = types;
         return types;
     }
 
-    @SuppressWarnings("unchecked")
     private ItemContainer getContainerViaECS(Vector3i pos) {
-        if (w == null) return null;
+        if (this.w == null) {
+            return null;
+        }
         try {
-            Store<ChunkStore> cs = w.getChunkStore().getStore();
-            Ref<ChunkStore> chunkRef = w.getChunkStore().getChunkReference(
-                    ChunkUtil.indexChunkFromBlock(pos.x, pos.z));
-            if (chunkRef == null) return null;
-            BlockComponentChunk bcc = cs.getComponent(chunkRef, BlockComponentChunk.getComponentType());
-            if (bcc == null) return null;
-            Ref<ChunkStore> blockRef = bcc.getEntityReference(
-                    ChunkUtil.indexBlockInColumn(pos.x, pos.y, pos.z));
-            if (blockRef == null) return null;
-            for (Object compType : getKnownContainerComponentTypes()) {
-                try {
-                    Object comp = cs.getComponent(blockRef, (ComponentType<ChunkStore, ?>) compType);
-                    if (comp != null) {
-                        Object containerObj = getItemContainerFromState(comp);
-                        if (containerObj instanceof ItemContainer ic) return ic;
-                    }
-                } catch (Throwable ignored) {}
+            Store<ChunkStore> cs = this.w.getChunkStore().getStore();
+            Ref<ChunkStore> chunkRef = this.w.getChunkStore().getChunkReference(ChunkUtil.indexChunkFromBlock(pos.x, pos.z));
+            if (chunkRef == null) {
+                return null;
             }
-        } catch (Throwable ignored) {}
+            BlockComponentChunk bcc = cs.getComponent(chunkRef, BlockComponentChunk.getComponentType());
+            if (bcc == null) {
+                return null;
+            }
+            Ref<ChunkStore> blockRef = bcc.getEntityReference(ChunkUtil.indexBlockInColumn(pos.x, pos.y, pos.z));
+            if (blockRef == null) {
+                return null;
+            }
+            for (Object compType : HopperProcessor.getKnownContainerComponentTypes()) {
+                try {
+                    Object containerObj;
+                    Object comp = cs.getComponent(blockRef, (ComponentType)compType);
+                    if (comp == null || !((containerObj = this.getItemContainerFromState(comp)) instanceof ItemContainer)) continue;
+                    ItemContainer ic = (ItemContainer)containerObj;
+                    return ic;
+                }
+                catch (Throwable throwable) {
+                }
+            }
+        }
+        catch (Throwable throwable) {
+            // empty catch block
+        }
         return null;
     }
 
-    // Engine-derived helpers (best-effort defaults when engine isn't wiring these in)
     public Vector3i getBlockPosition() {
-        // Try to call a superclass-provided position accessor (engine may supply it)
-        try {
-            Class<?> sc = this.getClass().getSuperclass();
-            if (sc != null) {
+        block5: {
+            try {
+                Class<?> sc = this.getClass().getSuperclass();
+                if (sc == null) break block5;
                 for (String name : new String[]{"getBlockPosition", "getPosition", "getPos", "position"}) {
                     try {
-                        java.lang.reflect.Method m = sc.getMethod(name);
-                        if (m != null) {
-                            Object r = m.invoke(this);
-                            if (r instanceof Vector3i) return (Vector3i) r;
-                        }
-                    } catch (Throwable ignored) {}
+                        Object r;
+                        Method m = sc.getMethod(name, new Class[0]);
+                        if (m == null || !((r = m.invoke((Object)this, new Object[0])) instanceof Vector3i)) continue;
+                        return (Vector3i)r;
+                    }
+                    catch (Throwable throwable) {
+                        // empty catch block
+                    }
                 }
             }
-        } catch (Throwable ignored) {}
-        return new Vector3i(0,0,0);
+            catch (Throwable throwable) {
+                // empty catch block
+            }
+        }
+        return new Vector3i(0, 0, 0);
     }
 
     public int getRotationIndex() {
@@ -361,145 +357,309 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
         return BlockType.EMPTY;
     }
 
-    // ── ArcIO integration ─────────────────────────────────────────────────────
-    /** True when ArcIO is present on the server classpath (detected once per class load). */
-    public static final boolean ARCIO_PRESENT;
-    static {
-        boolean found = false;
-        try { Class.forName("voidbond.arcio.components.ArcioMechanismComponent"); found = true; }
-        catch (ClassNotFoundException ignored) {}
-        ARCIO_PRESENT = found;
+    private ConnectedBlockPatternRule.AdjacentSide detectAdjacentTransferFace(Vector3i hopperPos) {
+        if (hopperPos == null || this.w == null) {
+            return null;
+        }
+        ConnectedBlockPatternRule.AdjacentSide found = null;
+        try {
+            for (ConnectedBlockPatternRule.AdjacentSide side : ConnectedBlockPatternRule.AdjacentSide.values()) {
+                try {
+                    boolean hasTarget;
+                    Vector3i rel = side.relativePosition;
+                    Vector3i targetPos = new Vector3i(hopperPos.x + ((Vector3i)((Object)rel)).x, hopperPos.y + ((Vector3i)((Object)rel)).y, hopperPos.z + ((Vector3i)((Object)rel)).z);
+                    boolean bl = hasTarget = this.getContainerViaECS(targetPos) != null;
+                    if (!hasTarget) {
+                        WorldChunk targetChunk = this.w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(targetPos.x, targetPos.z));
+                        Object state = targetChunk == null ? null : EngineCompat.getState(targetChunk, targetPos.x, targetPos.y, targetPos.z);
+                        boolean bl2 = hasTarget = state != null && (state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") || state.getClass().getSimpleName().contains("ItemContainer") || this.getItemContainerFromState(state) != null);
+                    }
+                    if (!hasTarget) continue;
+                    if (found != null) {
+                        return null;
+                    }
+                    found = side;
+                }
+                catch (Throwable throwable) {
+                    // empty catch block
+                }
+            }
+        }
+        catch (Throwable throwable) {
+            // empty catch block
+        }
+        return found;
     }
 
-    // ── Simple Drawers integration ────────────────────────────────────────────
-    /** True when Simple Drawers is present on the server classpath (detected once per class load). */
-    public static final boolean SIMPLE_DRAWERS_PRESENT;
-    static {
-        boolean found = false;
-        try { Class.forName("net.crepe.inventory.IDrawerContainer"); found = true; }
-        catch (ClassNotFoundException ignored) {}
-        SIMPLE_DRAWERS_PRESENT = found;
+    private void configureWirelessFacesFromPlacement(Vector3i hopperPos) {
+        if (hopperPos == null || this.data == null || this.w == null) {
+            return;
+        }
+        String wt = this.data.hopperType;
+        boolean isWirelessExport = "WirelessExport".equalsIgnoreCase(wt);
+        boolean isWirelessImport = "WirelessImport".equalsIgnoreCase(wt);
+        if (!isWirelessExport && !isWirelessImport) {
+            return;
+        }
+        boolean needsImportFace = isWirelessExport && (this.data.importFaces == null || this.data.importFaces.length == 0);
+        boolean needsExportFace = isWirelessImport && (this.data.exportFaces == null || this.data.exportFaces.length == 0);
+        boolean facesLikelySouthDefaultImport = isWirelessExport && this.data.importFaces != null && this.data.importFaces.length == 1 && this.data.importFaces[0] == ConnectedBlockPatternRule.AdjacentSide.South;
+        boolean facesLikelySouthDefaultExport = isWirelessImport && this.data.exportFaces != null && this.data.exportFaces.length == 1 && this.data.exportFaces[0] == ConnectedBlockPatternRule.AdjacentSide.South;
+        boolean pendingPlacementSelf = false;
+        boolean pendingPlacementNear = false;
+        try {
+            pendingPlacementSelf = WirelessHopperPlaceSystem.PENDING_TARGET_BLOCKS.containsKey(hopperPos);
+            for (ConnectedBlockPatternRule.AdjacentSide side : ConnectedBlockPatternRule.AdjacentSide.values()) {
+                Vector3i adj = new Vector3i(hopperPos.x + ((Vector3i)((Object)side.relativePosition)).x, hopperPos.y + ((Vector3i)((Object)side.relativePosition)).y, hopperPos.z + ((Vector3i)((Object)side.relativePosition)).z);
+                if (!WirelessHopperPlaceSystem.PENDING_TARGET_BLOCKS.containsKey(adj)) continue;
+                pendingPlacementNear = true;
+                break;
+            }
+        }
+        catch (Throwable throwable) {
+            // empty catch block
+        }
+        // Only run face detection when a placement event is actually pending — avoids re-overwriting
+        // the configured face on every subsequent tick via detectAdjacentTransferFace.
+        if (!pendingPlacementSelf && !pendingPlacementNear) {
+            return;
+        }
+        ConnectedBlockPatternRule.AdjacentSide face = null;
+        try {
+            for (ConnectedBlockPatternRule.AdjacentSide side : ConnectedBlockPatternRule.AdjacentSide.values()) {
+                Vector3i adj = new Vector3i(hopperPos.x + ((Vector3i)((Object)side.relativePosition)).x, hopperPos.y + ((Vector3i)((Object)side.relativePosition)).y, hopperPos.z + ((Vector3i)((Object)side.relativePosition)).z);
+                Long placedAt = WirelessHopperPlaceSystem.PENDING_TARGET_BLOCKS.remove(adj);
+                WirelessHopperPlaceSystem.PENDING_PLACEMENT_FACES.remove(adj);
+                if (placedAt == null) continue;
+                face = side;
+                break;
+            }
+            if (face == null) {
+                WirelessHopperPlaceSystem.PENDING_TARGET_BLOCKS.remove(hopperPos);
+                WirelessHopperPlaceSystem.PENDING_PLACEMENT_FACES.remove(hopperPos);
+                face = this.detectAdjacentTransferFace(hopperPos);
+            }
+        }
+        catch (Throwable throwable) {
+            // empty catch block
+        }
+        if (face == null) {
+            return;
+        }
+        if (isWirelessImport && (needsExportFace || facesLikelySouthDefaultExport || pendingPlacementSelf || pendingPlacementNear)) {
+            this.data.exportFaces = new ConnectedBlockPatternRule.AdjacentSide[]{face};
+        }
+        if (isWirelessExport && (needsImportFace || facesLikelySouthDefaultImport || pendingPlacementSelf || pendingPlacementNear)) {
+            this.data.importFaces = new ConnectedBlockPatternRule.AdjacentSide[]{face};
+        }
     }
-    /** Whether ArcIO mechanism & UUID components have been attached to this block entity. */
-    private boolean arcioInitialized = false;
-    /** "IgnoreSignal" (default – always run) or "EnableWhenSignal" (only run while ArcIO signal is active). */
-    private String arcioMode = "IgnoreSignal";
 
-    // Runtime filter state for this hopper (not persisted yet)
-    private final List<String> whitelist = Collections.synchronizedList(new ArrayList<>());
-    private final List<String> blacklist = Collections.synchronizedList(new ArrayList<>());
-    private volatile String filterMode = "Off";
-    // Temporary per-player typed buffer (so TextField changes can be captured even if Add button doesn't send value)
-    private final Map<com.hypixel.hytale.server.core.universe.PlayerRef, String> typedBuffer = new ConcurrentHashMap<>();
+    /*
+     * WARNING - Removed try catching itself - possible behaviour change.
+     */
+    public List<String> getWhitelist() {
+        List<String> list = this.whitelist;
+        synchronized (list) {
+            return new ArrayList<String>(this.whitelist);
+        }
+    }
 
-    public List<String> getWhitelist() { synchronized (whitelist) { return new ArrayList<>(whitelist); } }
-    public List<String> getBlacklist() { synchronized (blacklist) { return new ArrayList<>(blacklist); } }
-    public String getFilterMode() { return filterMode; }
-    public void addToWhitelist(String id) { if (id != null) whitelist.add(id); }
-    public void addToBlacklist(String id) { if (id != null) blacklist.add(id); }
-    public void setFilterMode(String mode) { if (mode != null) filterMode = mode; }
+    /*
+     * WARNING - Removed try catching itself - possible behaviour change.
+     */
+    public List<String> getBlacklist() {
+        List<String> list = this.blacklist;
+        synchronized (list) {
+            return new ArrayList<String>(this.blacklist);
+        }
+    }
+
+    public String getFilterMode() {
+        return this.filterMode;
+    }
+
+    public void addToWhitelist(String id) {
+        if (id != null) {
+            this.whitelist.add(id);
+        }
+    }
+
+    public void addToBlacklist(String id) {
+        if (id != null) {
+            this.blacklist.add(id);
+        }
+    }
+
+    public void setFilterMode(String mode) {
+        if (mode != null) {
+            this.filterMode = mode;
+        }
+    }
+
+    /*
+     * WARNING - Removed try catching itself - possible behaviour change.
+     */
     public String removeLastFromWhitelist() {
-        synchronized (whitelist) {
-            if (whitelist.isEmpty()) return null;
-            return whitelist.remove(whitelist.size() - 1);
+        List<String> list = this.whitelist;
+        synchronized (list) {
+            if (this.whitelist.isEmpty()) {
+                return null;
+            }
+            return this.whitelist.remove(this.whitelist.size() - 1);
         }
     }
+
+    /*
+     * WARNING - Removed try catching itself - possible behaviour change.
+     */
     public String removeLastFromBlacklist() {
-        synchronized (blacklist) {
-            if (blacklist.isEmpty()) return null;
-            return blacklist.remove(blacklist.size() - 1);
+        List<String> list = this.blacklist;
+        synchronized (list) {
+            if (this.blacklist.isEmpty()) {
+                return null;
+            }
+            return this.blacklist.remove(this.blacklist.size() - 1);
         }
     }
-    public void clearWhitelist() { whitelist.clear(); }
-    public void clearBlacklist() { blacklist.clear(); }
 
-    public String getArcioMode() { return arcioMode; }
-    public void setArcioMode(String mode) { if (mode != null) arcioMode = mode; }
-
-    public void setTypedBuffer(com.hypixel.hytale.server.core.universe.PlayerRef p, String v) {
-        if (p == null) return;
-        if (v == null) typedBuffer.remove(p);
-        else typedBuffer.put(p, v);
+    public void clearWhitelist() {
+        this.whitelist.clear();
     }
 
-    public String getTypedBuffer(com.hypixel.hytale.server.core.universe.PlayerRef p) {
-        if (p == null) return null;
-        return typedBuffer.get(p);
+    public void clearBlacklist() {
+        this.blacklist.clear();
+    }
+
+    public String getArcioMode() {
+        return this.arcioMode;
+    }
+
+    public void setArcioMode(String mode) {
+        if (mode != null) {
+            this.arcioMode = mode;
+        }
+    }
+
+    public void setTypedBuffer(PlayerRef p, String v) {
+        if (p == null) {
+            return;
+        }
+        if (v == null) {
+            this.typedBuffer.remove(p);
+        } else {
+            this.typedBuffer.put(p, v);
+        }
+    }
+
+    public String getTypedBuffer(PlayerRef p) {
+        if (p == null) {
+            return null;
+        }
+        return this.typedBuffer.get(p);
     }
 
     public boolean isSingletonMode() {
-        return "Singleton".equalsIgnoreCase(filterMode);
+        return "Singleton".equalsIgnoreCase(this.filterMode);
     }
 
-    // Returns true when the given block key is allowed to be imported according to filter state
-    private boolean isItemAllowedByFilter(String blockKey) {
-        // If mode is not set or Off or Singleton, allow everything
-        if (filterMode == null || filterMode.equalsIgnoreCase("Off") || filterMode.equalsIgnoreCase("Singleton")) return true;
-
-        // Whitelist mode: if whitelist is empty/null, block everything. Only allow exact matches.
-        if (filterMode.equalsIgnoreCase("Whitelist")) {
-            synchronized (whitelist) {
-                if (whitelist == null || whitelist.isEmpty()) return false;
-                if (blockKey == null) return false;
-                for (String s : whitelist) {
-                    if (s != null && s.equalsIgnoreCase(blockKey)) return true;
+    /*
+     * WARNING - Removed try catching itself - possible behaviour change.
+     */
+    public boolean isItemAllowedByFilter(String blockKey) {
+        if (this.filterMode == null || this.filterMode.equalsIgnoreCase("Off") || this.filterMode.equalsIgnoreCase("Singleton")) {
+            return true;
+        }
+        if (this.filterMode.equalsIgnoreCase("Whitelist")) {
+            List<String> list = this.whitelist;
+            synchronized (list) {
+                if (this.whitelist == null || this.whitelist.isEmpty()) {
+                    return false;
+                }
+                if (blockKey == null) {
+                    return false;
+                }
+                for (String s : this.whitelist) {
+                    if (s == null || !s.equalsIgnoreCase(blockKey)) continue;
+                    return true;
                 }
                 return false;
             }
         }
-
-        // Blacklist mode: if blacklist is empty/null, allow everything. Block only exact matches.
-        if (filterMode.equalsIgnoreCase("Blacklist")) {
-            synchronized (blacklist) {
-                if (blacklist == null || blacklist.isEmpty()) return true;
-                if (blockKey == null) return true;
-                for (String s : blacklist) {
-                    if (s != null && s.equalsIgnoreCase(blockKey)) return false;
+        if (this.filterMode.equalsIgnoreCase("Blacklist")) {
+            List<String> list = this.blacklist;
+            synchronized (list) {
+                if (this.blacklist == null || this.blacklist.isEmpty()) {
+                    return true;
+                }
+                if (blockKey == null) {
+                    return true;
+                }
+                for (String s : this.blacklist) {
+                    if (s == null || !s.equalsIgnoreCase(blockKey)) continue;
+                    return false;
                 }
                 return true;
             }
         }
-
-        // Default allow
         return true;
     }
 
-    // Try to resolve a reliable id/key string from an ItemStack using known accessors, fallback to toString()
     public String resolveItemStackKey(ItemStack stack) {
-        if (stack == null) return null;
+        if (stack == null) {
+            return null;
+        }
         try {
             Object probe = null;
-            try { probe = stack.getBlockKey(); } catch (Throwable ignored) {}
+            try {
+                probe = stack.getBlockKey();
+            }
+            catch (Throwable throwable) {
+                // empty catch block
+            }
             if (probe == null) {
                 Class<?> cls = stack.getClass();
                 Method m = ITEM_KEY_METHOD_CACHE.get(cls);
                 if (m == null && !ITEM_KEY_METHOD_CACHE.containsKey(cls)) {
+                    String[] candidates;
                     Method found = null;
-                    String[] candidates = new String[]{"getItemId","getItemKey","getId","getKey","getName","getBlockKey"};
-                    for (String name : candidates) {
+                    for (String name : candidates = new String[]{"getItemId", "getItemKey", "getId", "getKey", "getName", "getBlockKey"}) {
                         try {
-                            found = cls.getMethod(name);
-                            if (found != null) break;
-                        } catch (Throwable ignored) {}
+                            found = cls.getMethod(name, new Class[0]);
+                            if (found == null) continue;
+                            break;
+                        }
+                        catch (Throwable throwable) {
+                            // empty catch block
+                        }
                     }
-                    ITEM_KEY_METHOD_CACHE.put(cls, found); // cache even null to avoid repeated lookups
+                    ITEM_KEY_METHOD_CACHE.put(cls, found);
                     m = found;
                 }
                 if (m != null) {
                     try {
-                        Object v = m.invoke(stack);
-                        if (v != null) probe = v;
-                    } catch (Throwable ignored) {}
+                        Object v = m.invoke((Object)stack, new Object[0]);
+                        if (v != null) {
+                            probe = v;
+                        }
+                    }
+                    catch (Throwable throwable) {
+                        // empty catch block
+                    }
                 }
             }
-            if (probe == null) probe = stack.toString();
+            if (probe == null) {
+                probe = stack.toString();
+            }
             return String.valueOf(probe);
-        } catch (Throwable t) {
-            try { return String.valueOf(stack.toString()); } catch (Throwable ignored) { return null; }
         }
-    }
-    {
-        ic = new Ref[0];
+        catch (Throwable t) {
+            try {
+                return String.valueOf(stack.toString());
+            }
+            catch (Throwable ignored) {
+                return null;
+            }
+        }
     }
 
     public void setOwnerId(Player ownerId) {
@@ -511,286 +671,260 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
     }
 
     public void onOpen(@NonNullDecl Ref<EntityStore> ref, @NonNullDecl World world, @NonNullDecl Store<EntityStore> store) {
-        // Attach ArcIO components directly (null commandBuffer = direct store write, safe here
-        // because onOpen is not called from within the tick-loop archetype iteration).
-        if (ARCIO_PRESENT && !arcioInitialized) {
-            ensureArcioComponents(world, null);
+        if (ARCIO_PRESENT && !this.arcioInitialized) {
+            this.ensureArcioComponents(world, null);
         }
-        // Use the PageManager / InteractiveCustomUIPage approach to open the custom page for this hopper
-        rf = store.getComponent(ref, PlayerRef.getComponentType());
-        //HytaleLogger.getLogger().atInfo().log("HopperProcessor.onOpen called, playerRef=" + rf + " ref=" + ref);
+        this.rf = store.getComponent(ref, PlayerRef.getComponentType());
         try {
-            if (rf == null) {
-                //HytaleLogger.getLogger().at(Level.WARNING).log("PlayerRef is null in onOpen; cannot open UI");
+            if (this.rf == null) {
                 return;
             }
             Vector3i pos = this.getBlockPosition();
-            //HytaleLogger.getLogger().atInfo().log("HopperProcessor.onOpen: opening page for ref=" + ref + " playerRef=" + rf + " pos=" + pos);
-            org.Ev0Mods.plugin.api.ui.HopperUIPage.open(rf, store, pos, null);
-            //HytaleLogger.getLogger().atInfo().log("Opened HopperUIPage via HyUI PageBuilder for ref=" + ref);
-        } catch (Throwable t) {
-            //HytaleLogger.getLogger().at(Level.WARNING).log("Failed to open HopperUIPage: " + t.getMessage());
+            HopperUIPage.open(this.rf, store, pos, null);
+        }
+        catch (Throwable throwable) {
+            // empty catch block
         }
     }
 
     public boolean initialize(BlockType blockType) {
+        StateData stateData;
         boolean superInit = true;
         try {
-            java.lang.reflect.Method m = this.getClass().getSuperclass().getMethod("initialize", BlockType.class);
-            if (m != null) {
-                Object r = m.invoke(this, blockType);
-                if (r instanceof Boolean) superInit = (Boolean) r;
+            Object r;
+            Method m = this.getClass().getSuperclass().getMethod("initialize", BlockType.class);
+            if (m != null && (r = m.invoke((Object)this, blockType)) instanceof Boolean) {
+                superInit = (Boolean)r;
             }
-        } catch (Throwable ignored) {}
-
-        if (superInit && blockType != null && blockType.getState() instanceof Data data) {
-            this.data = data;
-            setItemContainer(new SimpleItemContainer((short) 1));
-            // Ensure fallback scheduler is aware of this processor even if the engine doesn't tick it yet
+        }
+        catch (Throwable m) {
+            // empty catch block
+        }
+        if (superInit && blockType != null && (stateData = blockType.getState()) instanceof Data) {
+            Data data;
+            this.data = data = (Data)stateData;
+            this.setItemContainer(new SimpleItemContainer((short)1));
             try {
                 REGISTERED_PROCESSORS.put(this, Boolean.TRUE);
                 this.lastEngineTick = System.currentTimeMillis();
-            } catch (Throwable ignored) {}
+            }
+            catch (Throwable throwable) {
+                // empty catch block
+            }
             return true;
         }
-
         return false;
-
     }
 
     public boolean canOpen(@NonNullDecl Ref<EntityStore> ref, @NonNullDecl ComponentAccessor<EntityStore> componentAccessor) {
-        // Allow the native container UI to open — don't block it here.
         try {
-            java.lang.reflect.Method m = this.getClass().getSuperclass().getMethod("canOpen", Ref.class, ComponentAccessor.class);
-            if (m != null) {
-                Object r = m.invoke(this, ref, componentAccessor);
-                if (r instanceof Boolean) return (Boolean) r;
+            Object r;
+            Method m = this.getClass().getSuperclass().getMethod("canOpen", Ref.class, ComponentAccessor.class);
+            if (m != null && (r = m.invoke((Object)this, ref, componentAccessor)) instanceof Boolean) {
+                return (Boolean)r;
             }
-        } catch (Throwable ignored) {
-            // fallback
+        }
+        catch (Throwable throwable) {
+            // empty catch block
         }
         return true;
     }
 
     public void onDestroy() {
-
-        for (int b = 0; b < l.size() - 1; b++) {
-            itemContainer.dropAllItemStacks();
-            if (!l.isEmpty()) {
-                    if (l.size() > b) {
-                    Ref<EntityStore> esx = l.get(0);
-                    l.remove(0);
-                    try { visualMap.remove(esx); visualSpawnTimes.remove(esx); } catch (Exception ignored) {}
-                    if (esx.isValid()) {
-                        this.es.removeEntity(esx, RemoveReason.REMOVE);
-                    }
-                }
+        for (int b = 0; b < this.l.size() - 1; ++b) {
+            this.itemContainer.dropAllItemStacks();
+            if (this.l.isEmpty() || this.l.size() <= b) continue;
+            Ref<EntityStore> esx = this.l.get(0);
+            this.l.remove(0);
+            try {
+                this.visualMap.remove(esx);
+                this.visualSpawnTimes.remove(esx);
             }
-
+            catch (Exception exception) {
+                // empty catch block
+            }
+            if (!esx.isValid()) continue;
+            this.es.removeEntity(esx, RemoveReason.REMOVE);
         }
-
         try {
-            java.lang.reflect.Method m = this.getClass().getSuperclass().getMethod("onDestroy");
-            if (m != null) m.invoke(this);
-        } catch (Throwable ignored) {}
-
-
+            Method m = this.getClass().getSuperclass().getMethod("onDestroy", new Class[0]);
+            if (m != null) {
+                m.invoke((Object)this, new Object[0]);
+            }
+        }
+        catch (Throwable throwable) {
+            // empty catch block
+        }
     }
-
-    @Nonnull
-    private static final Query<ChunkStore> QUERY = Query.and(FluidSection.getComponentType(), ChunkSection.getComponentType());
-    @Nonnull
-    private static final Set<Dependency<ChunkStore>> DEPENDENCIES = Set.of(
-            new SystemDependency<>(Order.AFTER, FluidSystems.Ticking.class), new SystemDependency<>(Order.BEFORE, ChunkBlockTickSystem.Ticking.class)
-    );
 
     private static boolean isProcessingBench(@Nullable BlockType bt) {
-        return bt != null
-                && bt.getState() != null;
+        return bt != null && bt.getState() != null;
     }
 
-
-    public void tick(float dt, int index, ArchetypeChunk<ChunkStore> archeChunk,
-                     Store<ChunkStore> store, CommandBuffer<ChunkStore> commandBuffer) {
-
-        // Diagnostic: log when engine invokes tick
-        try { HytaleLogger.getLogger().atWarning().log("[Ev0Lib][DIAG] HopperProcessor.tick invoked for instance=" + this + " index=" + index); } catch (Throwable ignored) {}
-        // mark that the engine invoked our tick so fallback knows it's running
-        lastEngineTick = System.currentTimeMillis();
-        REGISTERED_PROCESSORS.put(this, Boolean.TRUE);
-
-        // Migrate StateData -> HopperComponent on first tick for this block when possible
-        try {
-            Object ref = getRefFromArchetype(archeChunk, index);
-            if (ref != null) {
-                HopperComponent existing = getHopperComponent(store, ref);
-                if (existing == null) {
-                    // create new component from legacy data if present
-                    if (this.data != null) {
-                        HopperComponent hc = new HopperComponent();
-                        hc.data = this.data;
-                        putHopperComponent(store, ref, hc);
-                        // Clear local copy to prefer component-backed storage going forward
-                        this.data = null;
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-
-        w = store.getExternalData().getWorld();
-        final Store<EntityStore> entities = w.getEntityStore().getStore();
-        this.es = entities;
-
-        // Apply any deferred fluid-block removals from the previous tick
-        if (!pendingFluidRemovals.isEmpty()) {
-            for (long[] coords : pendingFluidRemovals) {
-                try {
-                    WorldChunk fc = w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock((int) coords[0], (int) coords[2]));
-                    if (fc != null) fc.setBlock((int) coords[0], (int) coords[1], (int) coords[2], BlockType.EMPTY);
-                } catch (Exception ignored) {}
-            }
-            pendingFluidRemovals.clear();
-        }
-
-        // Ensure ArcIO components are registered. commandBuffer.putComponent() defers the
-        // archetype migration to after the iteration loop completes, avoiding the crash.
-        if (ARCIO_PRESENT && !arcioInitialized) {
-            ensureArcioComponents(w, commandBuffer);
-        }
-
-        // ArcIO gate: if ArcIO is installed and the user chose "EnableWhenSignal", skip this
-        // tick entirely when there is no active ArcIO signal connected to the block.
-        if (ARCIO_PRESENT && "EnableWhenSignal".equals(arcioMode)) {
-            if (!isArcioActive(w)) return;
-        }
-
-        // Timer logic
-        this.timerV += 1.0;
-        drop = this.timerV >= duration.max;
-        if (drop) this.timerV = 0;
-
-        // if (rf != null) {
-        //     HudBuilder.hudForPlayer(rf).fromHtml("<div>Welcome!</div>")
-        //             .show(rf, entities);
-        // }
-
-        final Vector3i pos = this.getBlockPosition();
-
-        // Defer spatial queries until we know visuals may be spawned. This avoids
-        // running an expensive spatial collect on every tick for every hopper.
-        nearbyBuffer.clear();
-        // Tick-based transfer control: increment counter and only act every 90 ticks (cycle length 180).
-        // We multiply the previous 60-tick cycle by 3 to reduce heavy calls frequency.
-        tickCounter++;
-        int phase = tickCounter % 180; // 0..179
-        boolean doExport = phase == 0;   // export on ticks 0,180,360...
-        boolean doImport = phase == 90;  // import on ticks 90,270,450...
-
-        // Update cached nearby-player state once every 180 ticks to reduce query cost.
-        if (tickCounter % 180 == 0) {
+    @Override
+    public void tick(float dt, int index, ArchetypeChunk<ChunkStore> archeChunk, Store<ChunkStore> store, CommandBuffer<ChunkStore> commandBuffer) {
+        Store<EntityStore> entities;
+        block51: {
+            boolean doImport;
             try {
-                final java.util.List rawPlayers = (java.util.List) SpatialResource.getThreadLocalReferenceList();
-                final Vector3d center = new Vector3d(pos.x, pos.y, pos.z);
-                ((ComponentAccessor<EntityStore>) entities)
-                        .getResource(EntityModule.get().getPlayerSpatialResourceType())
-                        .getSpatialStructure()
-                        .collectCylinder(center, 4, Math.max(1.0f, data.height), rawPlayers);
-                playersNearbyCached = !rawPlayers.isEmpty();
-                rawPlayers.clear();
-            } catch (Exception ignored) {}
-        }
-
-
-        if (doExport) {
-            // Only compute nearby entities if we have items to export *and* players are nearby
-            ItemStack have = this.getItemContainer().getItemStack((short) 0);
-            if (have != null && playersNearbyCached) {
-                nearbyBuffer = getAllEntitiesInBox(this, pos, data.height, (ComponentAccessor<EntityStore>) entities, data.players, data.entities, data.items);
-            } else {
-                nearbyBuffer.clear();
+                ((HytaleLogger.Api)HytaleLogger.getLogger().atWarning()).log("[Ev0Lib][DIAG] HopperProcessor.tick invoked for instance=" + String.valueOf(this) + " index=" + index);
             }
-            runExportPhase(pos, entities);
-        }
-
-        if (doImport) {
-            // Only compute nearby entities if hopper has room to import items AND players are nearby
-            ItemStack have2 = this.getItemContainer().getItemStack((short) 0);
-            boolean hopperHasSpace = (have2 == null) || (have2.getQuantity() < 100);
-            if (hopperHasSpace && playersNearbyCached) {
-                nearbyBuffer = getAllEntitiesInBox(this, pos, data.height, (ComponentAccessor<EntityStore>) entities, data.players, data.entities, data.items);
-            } else {
-                nearbyBuffer.clear();
+            catch (Throwable throwable) {
+                // empty catch block
             }
-            // Import phase: try to pull from configured import faces AND collect fluids from world
-            for (AdjacentSide side : this.data.importFaces) {
-                final Vector3i importPos = new Vector3i(pos.x, pos.y, pos.z)
-                        .add(WorldHelper.rotate(side, this.getRotationIndex()).relativePosition);
-                final WorldChunk chunk = w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(importPos.x, importPos.z));
-                if (chunk == null) continue;
-
-                // IMPORT FLUID: If there's fluid at target and hopper is empty, create a bucket (collect fluid)
-                // Only run if fluid transfer is enabled in config
-                int targetFluidId = org.Ev0Mods.plugin.api.component.EngineCompat.getFluidId(chunk, importPos.x, importPos.y, importPos.z);
-                Object state = org.Ev0Mods.plugin.api.component.EngineCompat.getState(chunk, importPos.x, importPos.y, importPos.z);
-                boolean hasContainer = (state != null && (state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") || state.getClass().getSimpleName().contains("ItemContainer") || getItemContainerFromState(state) != null)) || (state == null && getContainerViaECS(importPos) != null);
-                ItemStack currentItem = this.getItemContainer().getItemStack((short) 0);
-                
-                if (Ev0Config.isFluidTransferEnabled() && targetFluidId != 0 && currentItem == null && !hasContainer) {
-                    ItemStack bucketStack = null;
-                    switch (targetFluidId) {
-                        case 2 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Red_Slime", 1, null);
-                        case 3 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Tar", 1, null);
-                        case 4 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Poison", 1, null);
-                        case 5 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Green_Slime", 1, null);
-                        case 6 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Lava", 1, null);
-                        case 7 -> bucketStack = new ItemStack("*Container_Bucket_State_Filled_Water", 1, null);
-                        default -> bucketStack = null;
-                    }
-
-                    if (bucketStack != null) {
-                        this.itemContainer.addItemStackToSlot((short) 0, bucketStack);
-                        // Defer setBlock to next tick — calling it during the archetype iteration
-                        // can shrink the chunk and cause IndexOutOfBoundsException in the engine.
-                        pendingFluidRemovals.add(new long[]{importPos.x, importPos.y, importPos.z});
-                        continue;
-                    }
+            this.lastEngineTick = System.currentTimeMillis();
+            REGISTERED_PROCESSORS.put(this, Boolean.TRUE);
+            try {
+                Object existing;
+                Object ref = this.getRefFromArchetype(archeChunk, index);
+                if (ref != null && (existing = this.getHopperComponent(store, ref)) == null && this.data != null) {
+                    HopperComponent hc = new HopperComponent();
+                    hc.data = this.data;
+                    this.putHopperComponent(store, ref, hc);
+                    this.data = null;
                 }
-
-                perfInfo("[Hopper][Import] side=" + side + " importPos=" + importPos + " state=" + (state == null ? "null" : state.getClass().getSimpleName()) + " hasContainer=" + hasContainer);
-
-                if (tryImportFromContainer(chunk, importPos, entities, side)) {
-                    perfInfo("[Hopper][Import] tryImportFromContainer SUCCESS side=" + side);
-                    break; // one successful import stops further faces this phase
+            }
+            catch (Throwable ref) {
+                // empty catch block
+            }
+            this.w = store.getExternalData().getWorld();
+            entities = this.w.getEntityStore().getStore();
+            this.es = entities;
+            if (!this.pendingFluidRemovals.isEmpty()) {
+                for (long[] coords : this.pendingFluidRemovals) {
+                    try {
+                        WorldChunk fc = this.w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock((int)coords[0], (int)coords[2]));
+                        if (fc == null) continue;
+                        fc.setBlock((int)coords[0], (int)coords[1], (int)coords[2], BlockType.EMPTY);
+                    }
+                    catch (Exception fc) {}
                 }
-
-                perfInfo("[Hopper][Import] tryImportFromContainer failed, hasContainer=" + hasContainer + " -> will tryPickup=" + !hasContainer);
-                // No matching block state at the import face — behave like a hopper:
-                // pick up item entities sitting in the 1x1x1 space where the input block would be.
-                if (!hasContainer && tryPickupItemEntities(importPos, entities)) {
-                    perfInfo("[Hopper][Import] tryPickupItemEntities SUCCESS at " + importPos);
-                    runExportPhase(pos, entities);
+                this.pendingFluidRemovals.clear();
+            }
+            if (ARCIO_PRESENT && !this.arcioInitialized) {
+                this.ensureArcioComponents(this.w, commandBuffer);
+            }
+            if (ARCIO_PRESENT && "EnableWhenSignal".equals(this.arcioMode) && !this.isArcioActive(this.w)) {
+                return;
+            }
+            this.timerV += 1.0;
+            boolean bl = this.drop = this.timerV >= (double)this.duration.max;
+            if (this.drop) {
+                this.timerV = 0.0;
+            }
+            Vector3i pos = this.getBlockPosition();
+            this.configureWirelessFacesFromPlacement(pos);
+            String _wt = this.data != null && this.data.hopperType != null ? this.data.hopperType : "Normal";
+            boolean isWireless = "WirelessExport".equalsIgnoreCase(_wt) || "WirelessImport".equalsIgnoreCase(_wt);
+            this.nearbyBuffer.clear();
+            ++this.tickCounter;
+            int phase = this.tickCounter % 180;
+            boolean doExport = phase == 0;
+            boolean bl2 = doImport = phase == 90;
+            if (this.tickCounter % 180 == 0) {
+                try {
+                    List rawPlayers = SpatialResource.getThreadLocalReferenceList();
+                    Vector3d center = new Vector3d((double)pos.x, (double)pos.y, (double)pos.z);
+                    entities.getResource(EntityModule.get().getPlayerSpatialResourceType()).getSpatialStructure().collectCylinder(center, 4.0, Math.max(1.0f, this.data.height), rawPlayers);
+                    this.playersNearbyCached = !rawPlayers.isEmpty();
+                    rawPlayers.clear();
+                }
+                catch (Exception rawPlayers) {
+                    // empty catch block
+                }
+            }
+            if (doExport) {
+                ItemStack have = this.getItemContainer().getItemStack((short)0);
+                if (have != null && (this.playersNearbyCached || isWireless)) {
+                    this.nearbyBuffer = HopperProcessor.getAllEntitiesInBox(this, pos, this.data.height, entities, this.data.players, this.data.entities, this.data.items);
+                } else {
+                    this.nearbyBuffer.clear();
+                }
+                this.runExportPhase(pos, entities);
+            }
+            if (doImport && !"WirelessImport".equalsIgnoreCase(_wt)) {
+                boolean hopperHasSpace;
+                ItemStack have2 = this.getItemContainer().getItemStack((short)0);
+                boolean bl3 = hopperHasSpace = have2 == null || have2.getQuantity() < 100;
+                if (hopperHasSpace && (this.playersNearbyCached || isWireless)) {
+                    this.nearbyBuffer = HopperProcessor.getAllEntitiesInBox(this, pos, this.data.height, entities, this.data.players, this.data.entities, this.data.items);
+                } else {
+                    this.nearbyBuffer.clear();
+                }
+                for (ConnectedBlockPatternRule.AdjacentSide side : this.data.importFaces) {
+                    Vector3i importPos = new Vector3i(pos.x + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).x, pos.y + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).y, pos.z + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).z);
+                    WorldChunk chunk = this.w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(importPos.x, importPos.z));
+                    if (chunk == null) continue;
+                    int targetFluidId = EngineCompat.getFluidId(chunk, importPos.x, importPos.y, importPos.z);
+                    Object state = EngineCompat.getState(chunk, importPos.x, importPos.y, importPos.z);
+                    boolean hasContainer = state != null && (state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") || state.getClass().getSimpleName().contains("ItemContainer") || this.getItemContainerFromState(state) != null) || state == null && this.getContainerViaECS(importPos) != null;
+                    ItemStack currentItem = this.getItemContainer().getItemStack((short)0);
+                    if (Ev0Config.isFluidTransferEnabled() && targetFluidId != 0 && currentItem == null && !hasContainer) {
+                        ItemStack bucketStack = null;
+                        switch (targetFluidId) {
+                            case 2: {
+                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Red_Slime", 1, null);
+                                break;
+                            }
+                            case 3: {
+                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Tar", 1, null);
+                                break;
+                            }
+                            case 4: {
+                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Poison", 1, null);
+                                break;
+                            }
+                            case 5: {
+                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Green_Slime", 1, null);
+                                break;
+                            }
+                            case 6: {
+                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Lava", 1, null);
+                                break;
+                            }
+                            case 7: {
+                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Water", 1, null);
+                                break;
+                            }
+                            default: {
+                                bucketStack = null;
+                            }
+                        }
+                        if (bucketStack != null) {
+                            this.itemContainer.addItemStackToSlot((short)0, bucketStack);
+                            this.pendingFluidRemovals.add(new long[]{importPos.x, importPos.y, importPos.z});
+                            continue;
+                        }
+                    }
+                    HopperProcessor.perfInfo("[Hopper][Import] side=" + String.valueOf((Object)side) + " importPos=" + String.valueOf(importPos) + " state=" + (state == null ? "null" : state.getClass().getSimpleName()) + " hasContainer=" + hasContainer);
+                    if (this.tryImportFromContainer(chunk, importPos, entities, side)) {
+                        HopperProcessor.perfInfo("[Hopper][Import] tryImportFromContainer SUCCESS side=" + String.valueOf((Object)side));
+                        break;
+                    }
+                    HopperProcessor.perfInfo("[Hopper][Import] tryImportFromContainer failed, hasContainer=" + hasContainer + " -> will tryPickup=" + !hasContainer);
+                    if (hasContainer || !this.tryPickupItemEntities(importPos, entities)) continue;
+                    HopperProcessor.perfInfo("[Hopper][Import] tryPickupItemEntities SUCCESS at " + String.valueOf(importPos));
+                    this.runExportPhase(pos, entities);
                     break;
                 }
             }
-        }
-
-        // Cleanup thrown entities: remove invalid refs and explicitly expire visuals after 5 seconds
-        if (!l.isEmpty()) {
-            Iterator<Ref<EntityStore>> it = l.iterator();
-            while (it.hasNext()) {
-                Ref<EntityStore> esx = it.next();
-                if (esx == null || !esx.isValid()) {
+            if (!this.l.isEmpty()) {
+                Iterator<Ref<EntityStore>> it = this.l.iterator();
+                while (it.hasNext()) {
+                    Ref<EntityStore> esx = it.next();
+                    if (esx != null && esx.isValid()) continue;
                     it.remove();
-                    try { visualMap.remove(esx); visualSpawnTimes.remove(esx); } catch (Exception ignored) {}
+                    try {
+                        this.visualMap.remove(esx);
+                        this.visualSpawnTimes.remove(esx);
+                    }
+                    catch (Exception exception) {}
                 }
             }
-        }
-
-        // Explicitly remove visual entities after 5 seconds instead of relying on DespawnComponent
-        try {
-            if (this.es != null && !visualSpawnTimes.isEmpty()) {
+            try {
+                if (this.es == null || this.visualSpawnTimes.isEmpty()) break block51;
                 Instant now = this.es.getResource(WorldTimeResource.getResourceType()).getGameTime();
-                Iterator<Map.Entry<Ref<EntityStore>, Instant>> it2 = visualSpawnTimes.entrySet().iterator();
+                Iterator<Map.Entry<Ref<EntityStore>, Instant>> it2 = this.visualSpawnTimes.entrySet().iterator();
                 while (it2.hasNext()) {
                     Map.Entry<Ref<EntityStore>, Instant> e = it2.next();
                     Ref<EntityStore> ref = e.getKey();
@@ -798,64 +932,157 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                     try {
                         if (ref == null || !ref.isValid()) {
                             it2.remove();
-                            try { visualMap.remove(ref); } catch (Exception ignored) {}
+                            try {
+                                this.visualMap.remove(ref);
+                            }
+                            catch (Exception exception) {}
                             continue;
                         }
-                        if (now.isAfter(spawnTime.plusSeconds(5))) {
-                            it2.remove();
-                            try { visualMap.remove(ref); } catch (Exception ignored) {}
-                            try { l.remove(ref); } catch (Exception ignored) {}
-                            try { this.es.removeEntity(ref, RemoveReason.REMOVE); } catch (Exception ignored) {}
+                        if (!now.isAfter(spawnTime.plusSeconds(5L))) continue;
+                        it2.remove();
+                        try {
+                            this.visualMap.remove(ref);
                         }
-                    } catch (Exception ignored) {}
+                        catch (Exception exception) {
+                            // empty catch block
+                        }
+                        try {
+                            this.l.remove(ref);
+                        }
+                        catch (Exception exception) {
+                            // empty catch block
+                        }
+                        try {
+                            this.es.removeEntity(ref, RemoveReason.REMOVE);
+                        }
+                        catch (Exception exception) {
+                        }
+                    }
+                    catch (Exception exception) {}
                 }
             }
-        } catch (Exception ignored) {}
-
+            catch (Exception exception) {
+                // empty catch block
+            }
+        }
         this.es = entities;
     }
 
-    /**
-     * Handles both export (to inputs) and import (from outputs) in one function.
-     */
-    private boolean tryTransferToOrFromContainer(Object state, Vector3i pos, AdjacentSide side,
-                                                 Store<EntityStore> entities, boolean exportPhase) {
-        //HytaleLogger.getLogger().atInfo().log("tryTransferToOrFromContainer: side=" + side + " exportPhase=" + exportPhase + " state=" + (state == null ? "null" : state.getClass().getSimpleName()));
-        // ECS fallback: if state is null, the target may be an ECS-only component (e.g. FertilizerState)
+    private boolean tryTransferToOrFromContainer(Object state, Vector3i pos, ConnectedBlockPatternRule.AdjacentSide side, Store<EntityStore> entities, boolean exportPhase) {
+        ItemStack have;
+        ItemContainer container;
+        Object bench;
         if (state == null) {
-            ItemContainer ecsContainer = getContainerViaECS(pos);
-            if (ecsContainer == null) return false;
+            ItemStack have2;
+            ItemStackSlotTransaction t;
+            ItemContainer ecsContainer = this.getContainerViaECS(pos);
+            if (ecsContainer == null) {
+                return false;
+            }
             if (!exportPhase) {
-                for (int slot = 0; slot < ecsContainer.getCapacity(); slot++) {
-                    ItemStack stack = ecsContainer.getItemStack((short) slot);
+                for (int slot = 0; slot < ecsContainer.getCapacity(); ++slot) {
+                    int transferAmount;
+                    ItemStack stack = ecsContainer.getItemStack((short)slot);
                     if (stack == null) continue;
                     String probeKey = null;
-                    try { probeKey = stack.getBlockKey(); } catch (Throwable ignored) {}
-                    if (probeKey == null) probeKey = resolveItemStackKey(stack);
-                    if (!isItemAllowedByFilter(probeKey)) continue;
-                    int srcAvailable = stack.getQuantity();
-                    if (isSingletonMode() && srcAvailable <= 1) continue;
-                    int transferAmount = isSingletonMode() && srcAvailable < data.tier * Ev0Config.getTierMultiplier() ? srcAvailable - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), srcAvailable);
-                    if (transferAmount <= 0) continue;
-                    ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, stack.withQuantity(transferAmount));
-                    if (t.succeeded()) {
-                        ecsContainer.removeItemStackFromSlot((short) slot, transferAmount);
-                        return true;
+                    try {
+                        probeKey = stack.getBlockKey();
                     }
+                    catch (Throwable throwable) {
+                        // empty catch block
+                    }
+                    if (probeKey == null) {
+                        probeKey = this.resolveItemStackKey(stack);
+                    }
+                    if (!this.isItemAllowedByFilter(probeKey)) continue;
+                    int srcAvailable = stack.getQuantity();
+                    if (this.isSingletonMode() && srcAvailable <= 1) continue;
+                    int n = transferAmount = this.isSingletonMode() && (float)srcAvailable < this.data.tier * (float)Ev0Config.getTierMultiplier() ? srcAvailable - 1 : (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)srcAvailable);
+                    if (transferAmount <= 0 || !(t = this.getItemContainer().addItemStackToSlot((short)0, stack.withQuantity(transferAmount))).succeeded()) continue;
+                    ecsContainer.removeItemStackFromSlot((short)slot, transferAmount);
+                    return true;
                 }
             }
-            if (exportPhase) {
-                ItemStack have = this.getItemContainer().getItemStack((short) 0);
-                if (have != null && have.getQuantity() > 0) {
-                    int haveQty = have.getQuantity();
-                    if (isSingletonMode() && haveQty <= 1) return false;
-                    int transferAmount = isSingletonMode() && haveQty < data.tier * Ev0Config.getTierMultiplier() ? haveQty - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), haveQty);
-                    ItemStack safeStack = have.withQuantity(transferAmount);
-                    for (int slot = 0; slot < ecsContainer.getCapacity(); slot++) {
-                        ItemStackSlotTransaction t = ecsContainer.addItemStackToSlot((short) slot, safeStack);
-                        if (t.succeeded()) {
-                            spawnVisualFor(safeStack, exportPhase, pos, side, entities);
-                            this.getItemContainer().removeItemStackFromSlot((short) 0, transferAmount);
+            if (exportPhase && (have2 = this.getItemContainer().getItemStack((short)0)) != null && have2.getQuantity() > 0) {
+                int haveQty = have2.getQuantity();
+                if (this.isSingletonMode() && haveQty <= 1) {
+                    return false;
+                }
+                int transferAmount = this.isSingletonMode() && (float)haveQty < this.data.tier * (float)Ev0Config.getTierMultiplier() ? haveQty - 1 : (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)haveQty);
+                ItemStack safeStack = have2.withQuantity(transferAmount);
+                for (int slot = 0; slot < ecsContainer.getCapacity(); ++slot) {
+                    t = ecsContainer.addItemStackToSlot((short)slot, safeStack);
+                    if (!t.succeeded()) continue;
+                    this.spawnVisualFor(safeStack, exportPhase, pos, side, entities);
+                    try {
+                        this.getItemContainer().removeItemStackFromSlot((short)0, transferAmount);
+                    } catch (Throwable th) {
+                        ecsContainer.removeItemStackFromSlot((short)slot, transferAmount);
+                        continue;
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (!state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") && !state.getClass().getSimpleName().contains("ItemContainer") && this.getItemContainerFromState(state) == null) {
+            return false;
+        }
+        boolean isProcessingBench = state != null && state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState");
+        Object object = bench = isProcessingBench ? state : null;
+        if (isProcessingBench) {
+            ItemContainer output = this.getContainerFromItemContainerObject(this.getItemContainerFromState(bench), 2);
+            if (!exportPhase) {
+                for (int slot = 0; slot < output.getCapacity(); ++slot) {
+                    int transferAmount;
+                    ItemStack stack = output.getItemStack((short)slot);
+                    if (stack == null) continue;
+                    String probeKeyPb = null;
+                    try {
+                        probeKeyPb = stack.getBlockKey();
+                    }
+                    catch (Throwable t) {
+                        // empty catch block
+                    }
+                    if (probeKeyPb == null) {
+                        probeKeyPb = this.resolveItemStackKey(stack);
+                    }
+                    if (!this.isItemAllowedByFilter(probeKeyPb)) continue;
+                    int pbAvailable = stack.getQuantity();
+                    if (this.isSingletonMode() && pbAvailable <= 1) continue;
+                    int n = transferAmount = this.isSingletonMode() && (float)pbAvailable < this.data.tier * (float)Ev0Config.getTierMultiplier() ? pbAvailable - 1 : (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)pbAvailable);
+                    if (transferAmount <= 0) continue;
+                    ItemStack safeStack = stack.withQuantity(transferAmount);
+                    ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short)0, safeStack);
+                    if (!t.succeeded()) continue;
+                    output.removeItemStackFromSlot((short)slot, transferAmount);
+                    return true;
+                }
+            } else {
+                ItemStack have3 = this.getItemContainer().getItemStack((short)0);
+                if (have3 != null && have3.getQuantity() > 0) {
+                    int transferAmount;
+                    int haveQty = have3.getQuantity();
+                    if (this.isSingletonMode() && haveQty <= 1) {
+                        return false;
+                    }
+                    int n = transferAmount = this.isSingletonMode() && (float)haveQty < this.data.tier * (float)Ev0Config.getTierMultiplier() ? haveQty - 1 : (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)haveQty);
+                    if (transferAmount <= 0) {
+                        return false;
+                    }
+                    ItemStack safeStack = have3.withQuantity(transferAmount);
+                    for (int c = 0; c <= 1; ++c) {
+                        ItemContainer input = this.getContainerFromItemContainerObject(this.getItemContainerFromState(bench), c);
+                        for (int slot2 = 0; slot2 < input.getCapacity(); ++slot2) {
+                            ItemStackSlotTransaction t = input.addItemStackToSlot((short)slot2, safeStack);
+                            if (!t.succeeded()) continue;
+                            this.spawnVisualFor(safeStack, exportPhase, pos, side, entities);
+                            try {
+                                this.getItemContainer().removeItemStackFromSlot((short)0, transferAmount);
+                            } catch (Throwable th) {
+                                input.removeItemStackFromSlot((short)slot2, transferAmount);
+                                continue;
+                            }
                             return true;
                         }
                     }
@@ -863,970 +1090,880 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
             }
             return false;
         }
-        if (!state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") && !state.getClass().getSimpleName().contains("ItemContainer") && getItemContainerFromState(state) == null)
-            return false;
-
-        boolean isProcessingBench = (state != null && state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState"));
-        Object bench = isProcessingBench ? state : null;
-
-        // Visual spawn moved to helper method to avoid lambda/metafactory churn
-
-        // ProcessingBench handling: respect phase
-        if (isProcessingBench) {
-            ItemContainer output = getContainerFromItemContainerObject(getItemContainerFromState(bench), 2);
+        Object containerObj = this.getItemContainerFromState(state);
+        ItemContainer itemContainer = container = containerObj instanceof ItemContainer ? (ItemContainer)containerObj : null;
+        if (SIMPLE_DRAWERS_PRESENT && container instanceof IDrawerContainer) {
+            IDrawerContainer drawerContainer = (IDrawerContainer)((Object)container);
             if (!exportPhase) {
-                // Import phase: pull from output into hopper if the hopper slot can accept items.
-                // Let addItemStackToSlot decide capacity — supports containers with custom stack limits.
-                for (int slot = 0; slot < output.getCapacity(); slot++) {
-                    ItemStack stack = output.getItemStack((short) slot);
-                    if (stack == null) continue;
-                    // Apply filter: skip items not allowed by filter (fast path via getBlockKey)
-                    String probeKeyPb = null;
-                    try { probeKeyPb = stack.getBlockKey(); } catch (Throwable ignored) {}
-                    if (probeKeyPb == null) probeKeyPb = resolveItemStackKey(stack);
-                    if (!isItemAllowedByFilter(probeKeyPb)) {
-                        continue;
-                    }
-                    int pbAvailable = stack.getQuantity();
-                    if (isSingletonMode() && pbAvailable <= 1) continue;
-                    int transferAmount = isSingletonMode() && pbAvailable < data.tier * Ev0Config.getTierMultiplier() ? pbAvailable - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), pbAvailable);
-                    if (transferAmount <= 0) continue;
-                    ItemStack safeStack = stack.withQuantity(transferAmount);
-                    ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, safeStack);
-                    if (t.succeeded()) {
-                        output.removeItemStackFromSlot((short) slot, transferAmount);
-                        return true;
-                    }
-                }
-            } else {
-                // Export phase: push from hopper into input containers 0 and 1
-                ItemStack have = this.getItemContainer().getItemStack((short) 0);
-                if (have != null && have.getQuantity() > 0) {
-                    int haveQty = have.getQuantity();
-                    if (isSingletonMode() && haveQty <= 1) return false;
-                    int transferAmount = isSingletonMode() && haveQty < data.tier * Ev0Config.getTierMultiplier() ? haveQty - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), haveQty);
-                    if (transferAmount <= 0) return false;
-                    ItemStack safeStack = have.withQuantity(transferAmount);
-                    for (int c = 0; c <= 1; c++) {
-                        ItemContainer input = getContainerFromItemContainerObject(getItemContainerFromState(bench), c);
-                        for (int slot = 0; slot < input.getCapacity(); slot++) {
-                            ItemStackSlotTransaction t = input.addItemStackToSlot((short) slot, safeStack);
-                            if (t.succeeded()) {
-                                //HytaleLogger.getLogger().atInfo().log("spawnVisual: caller=ProcessingBenchExport side=" + side + " pos=" + pos + " safeStack=" + safeStack);
-                                spawnVisualFor(safeStack, exportPhase, pos, side, entities);
-                                this.getItemContainer().removeItemStackFromSlot((short) 0, transferAmount);
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        // Normal container handling: try import first (if hopper has room), then export
-        // Capacity is determined by addItemStackToSlot itself — supports containers like Simple Drawers
-        // that override their own max stack, rather than relying on a hardcoded limit.
-        Object containerObj = getItemContainerFromState(state);
-        ItemContainer container = containerObj instanceof ItemContainer ? (ItemContainer) containerObj : null;
-
-        // Simple Drawers: use the IDrawerContainer API so transfer respects each slot's
-        // actual capacity (which can be thousands on upgraded drawers/controllers).
-        if (SIMPLE_DRAWERS_PRESENT && container instanceof IDrawerContainer drawerContainer) {
-            if (!exportPhase) {
-                // Import: pull from drawer slot into hopper using the drawer's slot API
-                for (short slot = 0; slot < drawerContainer.getSlotCount(); slot++) {
+                for (short slot = 0; slot < drawerContainer.getSlotCount(); slot = (short)(slot + 1)) {
+                    ItemStackSlotTransaction t;
+                    int transferAmount;
                     ItemStack slotItem = drawerContainer.getSlotItem(slot);
                     int slotQty = drawerContainer.getSlotQuantity(slot);
                     if (slotItem == null || slotQty <= 0) continue;
                     String probeKey = null;
-                    try { probeKey = slotItem.getBlockKey(); } catch (Throwable ignored) {}
-                    if (probeKey == null) probeKey = resolveItemStackKey(slotItem);
-                    if (!isItemAllowedByFilter(probeKey)) continue;
-                    if (isSingletonMode() && slotQty <= 1) continue;
-                    int transferAmount = isSingletonMode() && slotQty < data.tier * Ev0Config.getTierMultiplier() ? slotQty - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), slotQty);
-                    if (transferAmount <= 0) continue;
-                    ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, slotItem.withQuantity(transferAmount));
-                    if (t.succeeded()) {
-                        final short fSlot = slot;
-                        final int fNewQty = slotQty - transferAmount;
-                        final ItemStack fSlotItem = slotItem;
-                        drawerContainer.writeAction(() -> {
-                            drawerContainer.setSlot(fSlot, fSlotItem.withQuantity(fNewQty));
-                            return null;
-                        });
-                        return true;
+                    try {
+                        probeKey = slotItem.getBlockKey();
                     }
-                }
-                return false;
-            } else {
-                // Export: push from hopper into drawer using only IDrawerContainer interface methods.
-                ItemStack have = this.getItemContainer().getItemStack((short) 0);
-                if (have != null && have.getQuantity() > 0) {
-                    int haveQty = have.getQuantity();
-                    if (isSingletonMode() && haveQty <= 1) return false;
-                    int transferAmount = isSingletonMode() && haveQty < data.tier * Ev0Config.getTierMultiplier() ? haveQty - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), haveQty);
-
-                    // Pass 1: prefer an existing slot whose locked type matches the incoming item.
-                    short matchedSlot = -1;
-                    int matchedQty = 0;
-                    int matchedCap = 0;
-                    for (short slot = 0; slot < drawerContainer.getSlotCount(); slot++) {
-                        ItemStack slotItem = drawerContainer.getSlotItem(slot);
-                        if (ItemStack.isEmpty(slotItem)) continue; // uninitialized — skip in pass 1
-                        // Type must match first (same check SD does internally)
-                        if (!slotItem.isStackableWith(have)) continue;
-                        int slotQty = drawerContainer.getSlotQuantity(slot);
-                        int slotCap = drawerContainer.getSlotStackCapacity(slot);
-                        if (slotCap - slotQty <= 0) continue;
-                        if (drawerContainer.testCantAddToSlot(slot, have, slotItem)) continue;
-                        matchedSlot = slot;
-                        matchedQty = slotQty;
-                        matchedCap = slotCap;
-                        break;
+                    catch (Throwable slot2) {
+                        // empty catch block
                     }
-
-                    // Pass 2: if nothing matched, fall back to the first truly empty slot.
-                    if (matchedSlot == -1) {
-                        for (short slot = 0; slot < drawerContainer.getSlotCount(); slot++) {
-                            ItemStack slotItem = drawerContainer.getSlotItem(slot);
-                            if (!ItemStack.isEmpty(slotItem)) continue; // already has a type lock — skip
-                            int slotQty = drawerContainer.getSlotQuantity(slot);
-                            int slotCap = drawerContainer.getSlotStackCapacity(slot);
-                            if (slotCap - slotQty <= 0) continue;
-                            matchedSlot = slot;
-                            matchedQty = slotQty;
-                            matchedCap = slotCap;
-                            break;
-                        }
+                    if (probeKey == null) {
+                        probeKey = this.resolveItemStackKey(slotItem);
                     }
-
-                    if (matchedSlot != -1) {
-                        int room = matchedCap - matchedQty;
-                        int actualTransfer = Math.min(transferAmount, room);
-                        if (actualTransfer > 0) {
-                            final short fSlot = matchedSlot;
-                            final int fNewQty = matchedQty + actualTransfer;
-                            final int fActual = actualTransfer;
-                            final ItemStack fHave = have;
-                            drawerContainer.writeAction(() -> {
-                                drawerContainer.setSlot(fSlot, fHave.withQuantity(fNewQty));
-                                return null;
-                            });
-                            spawnVisualFor(have.withQuantity(fActual), exportPhase, pos, side, entities);
-                            this.getItemContainer().removeItemStackFromSlot((short) 0, fActual);
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }
-        }
-
-        // Import (only during import phase)
-        if (!exportPhase) {
-            for (int slot = 0; slot < container.getCapacity(); slot++) {
-                ItemStack stack = container.getItemStack((short) slot);
-                if (stack == null) continue;
-                // Apply filter: skip items not allowed by filter (fast path)
-                String probeKey = null;
-                try { probeKey = stack.getBlockKey(); } catch (Throwable ignored) {}
-                if (probeKey == null) probeKey = resolveItemStackKey(stack);
-                if (!isItemAllowedByFilter(probeKey)) {
-                    continue;
-                }
-                int srcAvailable = stack.getQuantity();
-                if (isSingletonMode() && srcAvailable <= 1) continue;
-                int transferAmount = isSingletonMode() && srcAvailable < data.tier * Ev0Config.getTierMultiplier() ? srcAvailable - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), srcAvailable);
-                if (transferAmount <= 0) continue;
-                ItemStack safeStack = stack.withQuantity(transferAmount);
-                ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, safeStack);
-                if (t.succeeded()) {
-                    container.removeItemStackFromSlot((short) slot, transferAmount);
-                    return true;
-                }
-            }
-        }
-
-        // Export (only during export phase)
-        if (exportPhase) {
-            ItemStack have = this.getItemContainer().getItemStack((short) 0);
-            if (have != null && have.getQuantity() > 0) {
-            int haveQty = have.getQuantity();
-            if (isSingletonMode() && haveQty <= 1) return false;
-            int transferAmount = isSingletonMode() && haveQty < data.tier * Ev0Config.getTierMultiplier() ? haveQty - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), haveQty);
-            ItemStack safeStack = have.withQuantity(transferAmount);
-            for (int slot = 0; slot < container.getCapacity(); slot++) {
-                ItemStackSlotTransaction t = container.addItemStackToSlot((short) slot, safeStack);
-                if (t.succeeded()) {
-                    //HytaleLogger.getLogger().atInfo().log("spawnVisual: caller=NormalExport side=" + side + " pos=" + pos + " safeStack=" + safeStack);
-                    spawnVisualFor(safeStack, exportPhase, pos, side, entities);
-                    this.getItemContainer().removeItemStackFromSlot((short) 0, transferAmount);
-                    return true;
-                }
-            }
-        }
-        }
-        return false;
-    }
-
-
-    /**
-     * Handles both export (to inputs) and import (from outputs) in one function.
-     */
-
-    // Extracted visual spawn logic to a method to avoid per-call lambda allocation
-    private void spawnVisualFor(ItemStack safeStack, boolean exportPhase, Vector3i pos, AdjacentSide side, Store<EntityStore> entities) {
-        if (safeStack == null || safeStack.isEmpty()) return;
-        Vector3i rel = WorldHelper.rotate(side, this.getRotationIndex()).relativePosition;
-        Vector3i hopperBlock = this.getBlockPosition();
-        Vector3d hopperCenter = new Vector3d(hopperBlock.x + 0.5 +1, hopperBlock.y + 0.5, hopperBlock.z + 0.5);
-        Vector3d sourceCenter = new Vector3d(pos.x + 0.5 +1, pos.y + 0.5, pos.z + 0.5);
-        Vector3d spawnPos = exportPhase ? hopperCenter : sourceCenter;
-        Vector3d velocity = exportPhase ? new Vector3d(-rel.x * 0.35, 0.25, -rel.z * 0.35) : new Vector3d(rel.x * 0.35, 0.25, rel.z * 0.35);
-
-        if (exportPhase) {
-            List<Ref<EntityStore>> nearby = nearbyBuffer;
-            if (!nearby.isEmpty()) {
-                boolean anySpawned = false;
-                for (Ref<EntityStore> targetRef : nearby) {
-                    String oppSide;
-                    switch (side.toString()) {
-                        case "East" -> oppSide = "West";
-                        case "West" -> oppSide = "East";
-                        case "North" -> oppSide = "South";
-                        case "South" -> oppSide = "North";
-                        case "Up" -> oppSide = "Down";
-                        case "Down" -> oppSide = "Up";
-                        default -> oppSide = side.toString();
-                    }
-                    Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), oppSide, new Vector3d(hopperBlock.x, hopperBlock.y, hopperBlock.z), targetRef, (ComponentAccessor<EntityStore>) entities, safeStack, Vector3d.ZERO, 0f);
-                    if (rs != null) {
-                        l.add(rs);
-                        try {
-                            visualMap.put(rs, safeStack);
-                            Instant now = entities != null ? entities.getResource(WorldTimeResource.getResourceType()).getGameTime() : Instant.now();
-                            visualSpawnTimes.put(rs, now);
-                        } catch (Exception ignored) {}
-                        anySpawned = true;
-                    }
-                }
-                if (anySpawned) return;
-            }
-        }
-
-        if (nearbyBuffer.isEmpty()) return;
-
-        Holder<EntityStore> itemEntityHolder = ItemComponent.generateItemDrop((ComponentAccessor<EntityStore>) entities, safeStack, new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z), Vector3f.ZERO, 0, -1, 0);
-        if (itemEntityHolder == null) return;
-
-        ItemComponent itemComponent = (ItemComponent) itemEntityHolder.getComponent(ItemComponent.getComponentType());
-        if (itemComponent != null) {
-            itemComponent.setPickupDelay(100000000);
-            itemComponent.setRemovedByPlayerPickup(false);
-            itemComponent.computeDynamicLight();
-        }
-
-        try {
-            ((PhysicsValues) itemEntityHolder.ensureAndGetComponent(PhysicsValues.getComponentType())).replaceValues(new PhysicsValues(0,0,true));
-            ((Velocity) itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(velocity.x, velocity.y, velocity.z);
-        } catch (Exception ignored) {}
-        try { itemEntityHolder.tryRemoveComponent(BoundingBox.getComponentType()); } catch (Exception ignored) {}
-        try { itemEntityHolder.ensureAndGetComponent(Intangible.getComponentType()); } catch (Exception ignored) {}
-
-        Ref<EntityStore> spawned = entities.addEntity(itemEntityHolder, AddReason.SPAWN);
-        if (spawned != null) {
-            TransformComponent tc = entities.getComponent(spawned, TransformComponent.getComponentType());
-            if (tc != null) tc.setPosition(new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z));
-            l.add(spawned);
-            try {
-                visualMap.put(spawned, safeStack);
-                Instant now = entities != null ? entities.getResource(WorldTimeResource.getResourceType()).getGameTime() : Instant.now();
-                visualSpawnTimes.put(spawned, now);
-            } catch (Exception ignored) {}
-        }
-    }
-
-
-
-/* ============================================================
-   EXPORT
-   ============================================================ */
-
-    /** Runs the full export cycle (same logic as the doExport tick phase). */
-    private void runExportPhase(Vector3i pos, Store<EntityStore> entities) {
-        // Fast-path: if hopper is empty, skip work entirely (most common case).
-        ItemStack currentItemFast = this.getItemContainer().getItemStack((short) 0);
-        if (currentItemFast == null) return;
-
-        for (AdjacentSide side : this.data.exportFaces) {
-            final Vector3i exportPos = new Vector3i(pos.x, pos.y, pos.z)
-                    .add(WorldHelper.rotate(side, this.getRotationIndex()).relativePosition);
-            final WorldChunk chunk = w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(exportPos.x, exportPos.z));
-            if (chunk == null) continue;
-
-            Object state = org.Ev0Mods.plugin.api.component.EngineCompat.getState(chunk, exportPos.x, exportPos.y, exportPos.z);
-            int targetFluidId = org.Ev0Mods.plugin.api.component.EngineCompat.getFluidId(chunk, exportPos.x, exportPos.y, exportPos.z);
-            boolean hasContainer = (state != null && (state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") || state.getClass().getSimpleName().contains("ItemContainer") || getItemContainerFromState(state) != null)) || (state == null && getContainerViaECS(exportPos) != null);
-            ItemStack currentItem = this.getItemContainer().getItemStack((short) 0);
-
-            if (Ev0Config.isFluidTransferEnabled() && currentItem != null && !hasContainer && targetFluidId != 0) {
-                String itemKey = currentItem.getBlockKey();
-                if (itemKey != null && itemKey.contains("Bucket") && !itemKey.contains("Empty")) {
-                    int fluidToPlace = 0;
-                    if (itemKey.contains("Water")) fluidToPlace = 7;
-                    else if (itemKey.contains("Lava")) fluidToPlace = 6;
-                    else if (itemKey.contains("Green_Slime")) fluidToPlace = 5;
-                    else if (itemKey.contains("Poison")) fluidToPlace = 4;
-                    else if (itemKey.contains("Tar")) fluidToPlace = 3;
-                    else if (itemKey.contains("Red_Slime")) fluidToPlace = 2;
-                    if (fluidToPlace != 0) {
-                        this.itemContainer.removeItemStackFromSlot((short) 0, 1);
-                        this.itemContainer.addItemStackToSlot((short) 0, new ItemStack("Container_Bucket", 1, null));
-                        continue;
-                    }
-                }
-            }
-
-            boolean transferred = tryTransferToOrFromContainer(state, exportPos, side, entities, true);
-
-            if (!transferred && currentItem != null && !hasContainer && targetFluidId == 0) {
-                if (isSingletonMode() && currentItem.getQuantity() <= 1) continue;
-                if (org.Ev0Mods.plugin.api.component.EngineCompat.getBlockType(chunk, exportPos.x, exportPos.y, exportPos.z) == null) {
-                    org.Ev0Mods.plugin.api.component.EngineCompat.setBlock(chunk, exportPos.x, exportPos.y, exportPos.z, currentItem.getBlockKey());
-                    this.getItemContainer().removeItemStackFromSlot((short) 0, 1);
-                }
-            }
-
-            if (this.data.exportOnce && transferred) break;
-        }
-    }
-
-    private boolean handleExport(World world, Store<EntityStore> entities) {
-
-        ItemStack source = this.getItemContainer().getItemStack((short) 0);
-        if (source == null) return false;
-
-        int srcQty = source.getQuantity();
-        if (isSingletonMode() && srcQty <= 1) return false;
-        int transferAmount = isSingletonMode() && srcQty < data.tier * 2 ? srcQty - 1 : (int) Math.min(data.tier * 2, srcQty);
-        if (transferAmount <= 0) return false;
-
-        Vector3i basePos = this.getBlockPosition();
-        BlockPosition pos = world.getBaseBlock(
-                new BlockPosition(basePos.x, basePos.y, basePos.z)
-        );
-
-        for (AdjacentSide side : data.exportFaces) {
-
-            Vector3i targetPos = new Vector3i(pos.x, pos.y, pos.z)
-                    .add(WorldHelper.rotate(side, this.getRotationIndex()).relativePosition);
-
-            WorldChunk chunk = world.getChunkIfInMemory(
-                    ChunkUtil.indexChunkFromBlock(targetPos.x, targetPos.z)
-            );
-
-            if (chunk == null) continue;
-
-            if (tryExportToContainer(chunk, targetPos, source, transferAmount))
-                return true;
-
-            if (tryExportToWorld(chunk, targetPos, source, transferAmount))
-                return true;
-        }
-
-        return false;
-    }
-
-
-    private boolean tryExportToContainer(WorldChunk chunk,
-                                         Vector3i pos,
-                                         ItemStack source,
-                                         int amount) {
-
-        Object state = org.Ev0Mods.plugin.api.component.EngineCompat.getState(chunk, pos.x, pos.y, pos.z);
-        if (state != null && state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState")) {
-
-            Object bench = state;
-
-            ItemStack sourcex = this.getItemContainer().getItemStack((short) 0);
-            if (sourcex == null) return false;
-
-            int srcxQty = sourcex.getQuantity();
-            if (isSingletonMode() && srcxQty <= 1) return false;
-            int transferAmount = isSingletonMode() && srcxQty < data.tier * 2 ? srcxQty - 1 : (int) Math.min(data.tier * 2, srcxQty);
-            if (transferAmount <= 0) return false;
-
-            ItemStack safeStack = sourcex.withQuantity(transferAmount);
-
-            // Apply filter: do not export items that are blocked by filter
-            if (!isItemAllowedByFilter(safeStack.getBlockKey())) {
-                return false;
-            }
-
-            // Only input containers (0 and 1)
-            for (int c = 0; c <= 1; c++) {
-
-                ItemContainer input = getContainerFromItemContainerObject(getItemContainerFromState(bench), c);
-                if (input == null) continue;
-
-                for (int slot = 0; slot < input.getCapacity(); slot++) {
-
-                    ItemStackSlotTransaction t = input.addItemStackToSlot((short) slot, safeStack);
-
-                    if (t.succeeded()) {
-
-                        this.getItemContainer().removeItemStackFromSlot((short) 0, transferAmount);
-
-                        return true; // one batch per tick
-                    }
-                }
-            }
-
-            return false;
-        }
-
-
-        Object containerStateObj = null;
-        try {
-            java.lang.reflect.Method m = state.getClass().getMethod("getItemContainer");
-            containerStateObj = m.invoke(state);
-        } catch (Throwable ignored) {}
-        if (containerStateObj == null) return false;
-        ItemContainer target = (ItemContainer) containerStateObj;
-
-        for (int slot = 0; slot < target.getCapacity(); slot++) {
-
-            // Apply filter: do not export items that are blocked by filter
-            if (!isItemAllowedByFilter(source.getBlockKey())) {
-                //HytaleLogger.getLogger().atInfo().log("Hopper filter: blocking export to container item=" + source.getBlockKey() + " mode=" + getFilterMode());
-                return false;
-            }
-
-            ItemStackSlotTransaction t =
-                    target.addItemStackToSlot((short) slot,
-                            source.withQuantity(amount));
-
-            if (t.succeeded()) {
-                this.getItemContainer()
-                        .removeItemStackFromSlot((short) 0, amount);
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-
-    private boolean tryExportToWorld(WorldChunk chunk,
-                                     Vector3i pos,
-                                     ItemStack source,
-                                     int amount) {
-
-        // Apply filter: do not export items that are blocked by filter
-        if (!isItemAllowedByFilter(source.getBlockKey())) {
-            //HytaleLogger.getLogger().atInfo().log("Hopper filter: blocking export to world item=" + source.getBlockKey() + " mode=" + getFilterMode());
-            return false;
-        }
-
-        // If block is empty, place block item
-        if (org.Ev0Mods.plugin.api.component.EngineCompat.getBlockType(chunk, pos.x, pos.y, pos.z) == null) {
-            // Only place a block when the target position currently contains a fluid (liquid).
-            int fluidId = org.Ev0Mods.plugin.api.component.EngineCompat.getFluidId(chunk, pos.x, pos.y, pos.z);
-            if (fluidId != 0) {
-                org.Ev0Mods.plugin.api.component.EngineCompat.setBlock(chunk, pos.x, pos.y, pos.z,
-                        source.getBlockKey());
-
-                this.getItemContainer()
-                        .removeItemStackFromSlot((short) 0, amount);
-
-                // Remove any visual entities we spawned that are at this position
-                try {
-                    if (this.l != null && !this.l.isEmpty() && this.es != null) {
-                        Iterator<Ref<EntityStore>> it = this.l.iterator();
-                        while (it.hasNext()) {
-                            Ref<EntityStore> ref = it.next();
-                            try {
-                                if (ref != null && ref.isValid()) {
-                                    TransformComponent tc = this.es.getComponent(ref, TransformComponent.getComponentType());
-                                    if (tc != null) {
-                                        Vector3d p = tc.getPosition();
-                                        // if the spawned entity is within the block center (±0.6) remove it
-                                        if (Math.abs(p.x - (pos.x + 0.5)) < 0.6 && Math.abs(p.y - (pos.y + 0.5)) < 0.6 && Math.abs(p.z - (pos.z + 0.5)) < 0.6) {
-                                                                    it.remove();
-                                                                    try { visualMap.remove(ref); } catch (Exception ignored) {}
-                                                                    try { visualSpawnTimes.remove(ref); } catch (Exception ignored) {}
-                                                                    try { this.es.removeEntity(ref, RemoveReason.REMOVE); } catch (Exception ignored) {}
-                                        }
-                                    }
-                                } else {
-                                    it.remove();
-                                    try { visualMap.remove(ref); visualSpawnTimes.remove(ref); } catch (Exception ignored) {}
-                                }
-                            } catch (Exception ignored) {}
-                        }
-                    }
-                } catch (Exception ignored) {}
-
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-
-
-/* ============================================================
-   IMPORT
-   ============================================================ */
-
-    private boolean handleImport(World world, Store<EntityStore> entities) {
-
-        Vector3i basePos = this.getBlockPosition();
-        BlockPosition pos = world.getBaseBlock(
-                new BlockPosition(basePos.x, basePos.y, basePos.z)
-        );
-
-        for (AdjacentSide side : data.importFaces) {
-
-            Vector3i targetPos = new Vector3i(pos.x, pos.y, pos.z)
-                    .add(WorldHelper.rotate(side, this.getRotationIndex()).relativePosition);
-
-            WorldChunk chunk = world.getChunkIfInMemory(
-                    ChunkUtil.indexChunkFromBlock(targetPos.x, targetPos.z)
-            );
-
-            if (chunk == null) continue;
-
-            if (tryImportFromContainer(chunk, targetPos, entities, side))
-                return true;
-        }
-
-        return false;
-    }
-
-
-    private boolean tryImportFromContainer(WorldChunk chunk,
-                                           Vector3i pos,
-                                           Store<EntityStore> entities,
-                                           AdjacentSide side) {
-        // Fast path: if this hopper is already full, skip scanning containers entirely.
-        ItemStack destStack = this.getItemContainer().getItemStack((short) 0);
-        if (destStack != null && destStack.getQuantity() >= 100) return false;
-
-        Object state = org.Ev0Mods.plugin.api.component.EngineCompat.getState(chunk, pos.x, pos.y, pos.z);
-
-    /* ---------------------------------
-       Special handling: Processing Bench
-       --------------------------------- */
-        if (state != null && state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState")) {
-
-            // Only import from output container (2)
-            ItemContainer output = getContainerFromItemContainerObject(getItemContainerFromState(state), 2);
-            if (output == null) return false;
-
-            int outCap = output.getCapacity();
-            for (int slot = 0; slot < outCap; slot++) {
-            ItemStack stack = output.getItemStack((short) slot);
-            if (stack == null) continue;
-            // Apply filter: prefer fast path via getBlockKey() then fallback to resolve
-            String blockKey = null;
-            try { blockKey = stack.getBlockKey(); } catch (Throwable ignored) {}
-            if (blockKey == null) blockKey = resolveItemStackKey(stack);
-            if (!isItemAllowedByFilter(blockKey)) continue;
-
-                int available = stack.getQuantity();
-                // Singleton mode: leave at least 1 item in the source slot so auto-refill mods keep working
-                if (isSingletonMode() && available <= 1) continue;
-                int transferAmount = isSingletonMode() && available < data.tier * Ev0Config.getTierMultiplier() ? available - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), available);
-                if (transferAmount <= 0) continue;
-
-                ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, stack.withQuantity(transferAmount));
-
-                if (t.succeeded()) {
-
-                    // Visual: throw the consumed item towards nearby players/entities/items
-                    Vector3i relRot = WorldHelper.rotate(side, this.getRotationIndex()).relativePosition;
-                    Vector3d velRot = new Vector3d(relRot.x * 0.35, 0.25, relRot.z * 0.35);
-                            Vector3i hopperBlock = this.getBlockPosition();
-                            Vector3d hopperCenter = new Vector3d(hopperBlock.x + 0.5, hopperBlock.y + 0.5, hopperBlock.z + 0.5);
-                            // No visual spawn on import; visuals only appear on export.
-
-                    // Optionally remove the visual entity if drop flag is set
-                    if (drop) {
-                        if (!l.isEmpty()) {
-                            if (l.getFirst() != null) {
-                                Ref<EntityStore> esx = l.getFirst();
-                                if (esx.isValid()) {
-                                    l.removeFirst();
-                                    try { visualMap.remove(esx); visualSpawnTimes.remove(esx); } catch (Exception ignored) {}
-                                    entities.removeEntity(esx, RemoveReason.REMOVE);
-                                }
-                            }
-                        }
-                    }
-
-                        output.removeItemStackFromSlot((short) slot, transferAmount);
-
-                    return true; // one batch per tick
-                }
-            }
-
-            return false;
-        }
-
-        // Special-case: importing from another HopperProcessor
-        if (state instanceof HopperProcessor otherHopper) {
-            // Let addItemStackToSlot decide whether the hopper slot can accept — no hardcoded cap.
-            int otherCap = otherHopper.getItemContainer().getCapacity();
-            for (int n = 0; n < otherCap; n++) {
-                ItemStack otherStack = otherHopper.getItemContainer().getItemStack((short) n);
-                if (otherStack == null) continue;
-
-                String otherKey = null;
-                try { otherKey = otherStack.getBlockKey(); } catch (Throwable ignored) {}
-                if (otherKey == null) otherKey = resolveItemStackKey(otherStack);
-                if (!isItemAllowedByFilter(otherKey)) continue;
-
-                int otherAvailable = otherStack.getQuantity();
-                // Singleton mode: leave at least 1 item in the other hopper's slot
-                if (isSingletonMode() && otherAvailable <= 1) continue;
-                int transferAmount = isSingletonMode() && otherAvailable < data.tier * Ev0Config.getTierMultiplier() ? otherAvailable - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), otherAvailable);
-                if (transferAmount <= 0) continue;
-
-                ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, otherStack.withQuantity(transferAmount));
-                if (t.succeeded()) {
-                    // Spawn hopper-to-hopper visual using the tick-buffered player list.
-                    if (!nearbyBuffer.isEmpty()) {
-                        ItemStack taken = this.getItemContainer().getItemStack((short) 0);
-                        if (taken != null && !taken.isEmpty()) {
-                            // Pass `side` directly — throwItem's velocity table already moves the
-                            // entity in the correct direction (from the other hopper toward this one).
-                            for (Ref<EntityStore> targetRef : nearbyBuffer) {
-                                Ref<EntityStore> rs = ItemUtilsExtended.throwItem(
-                                        this.getBlockType().getId(), side.toString(),
-                                        new Vector3d(pos.x, pos.y, pos.z),
-                                        targetRef, (ComponentAccessor<EntityStore>) entities,
-                                        taken, Vector3d.ZERO, 0f);
-                                if (rs != null) {
-                                    l.add(rs);
-                                    try {
-                                        visualMap.put(rs, taken);
-                                        Instant now = this.es != null ? this.es.getResource(WorldTimeResource.getResourceType()).getGameTime() : Instant.now();
-                                        visualSpawnTimes.put(rs, now);
-                                    } catch (Exception ignored) {}
-                                }
-                            }
-                        }
-                    }
-                    otherHopper.getItemContainer().removeItemStackFromSlot((short) n, transferAmount);
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-    /* ---------------------------------
-       Normal container handling
-       --------------------------------- */
-        Object containerStateObj = null;
-        try {
-            java.lang.reflect.Method m = state.getClass().getMethod("getItemContainer");
-            containerStateObj = m.invoke(state);
-        } catch (Throwable ignored) {}
-        if (containerStateObj == null) {
-            // ECS fallback: try to find a container via ECS component lookup
-            ItemContainer ecsContainer = getContainerViaECS(pos);
-            if (ecsContainer != null) {
-                for (int slot = 0; slot < ecsContainer.getCapacity(); slot++) {
-                    ItemStack stack = ecsContainer.getItemStack((short) slot);
-                    if (stack == null) continue;
-                    String probeKey = null;
-                    try { probeKey = stack.getBlockKey(); } catch (Throwable ignored) {}
-                    if (probeKey == null) probeKey = resolveItemStackKey(stack);
-                    if (!isItemAllowedByFilter(probeKey)) continue;
-                    int srcAvailable = stack.getQuantity();
-                    if (isSingletonMode() && srcAvailable <= 1) continue;
-                    int transferAmount = isSingletonMode() && srcAvailable < data.tier * Ev0Config.getTierMultiplier() ? srcAvailable - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), srcAvailable);
-                    if (transferAmount <= 0) continue;
-                    ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, stack.withQuantity(transferAmount));
-                    if (t.succeeded()) {
-                        ecsContainer.removeItemStackFromSlot((short) slot, transferAmount);
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-        ItemContainer sourceContainer = (ItemContainer) containerStateObj;
-
-        // Simple Drawers: use the IDrawerContainer API so we read the actual slot quantity
-        // (which can be thousands on upgraded drawers/controllers) and remove via setSlot.
-        if (SIMPLE_DRAWERS_PRESENT && sourceContainer instanceof IDrawerContainer drawerContainer) {
-            for (short slot = 0; slot < drawerContainer.getSlotCount(); slot++) {
-                ItemStack slotItem = drawerContainer.getSlotItem(slot);
-                int slotQty = drawerContainer.getSlotQuantity(slot);
-                if (slotItem == null || slotQty <= 0) continue;
-                String probeKey2 = null;
-                try { probeKey2 = slotItem.getBlockKey(); } catch (Throwable ignored) {}
-                if (probeKey2 == null) probeKey2 = resolveItemStackKey(slotItem);
-                if (!isItemAllowedByFilter(probeKey2)) continue;
-                // Singleton mode: leave at least 1 item in the drawer slot
-                if (isSingletonMode() && slotQty <= 1) continue;
-                int transferAmount = isSingletonMode() && slotQty < data.tier * Ev0Config.getTierMultiplier() ? slotQty - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), slotQty);
-                if (transferAmount <= 0) continue;
-                ItemStack safeStack = slotItem.withQuantity(transferAmount);
-                ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short) 0, safeStack);
-                if (t.succeeded()) {
-                    if (!nearbyBuffer.isEmpty()) {
-                        String oppSide;
-                        switch (side.toString()) {
-                            case "East" -> oppSide = "West";
-                            case "West" -> oppSide = "East";
-                            case "North" -> oppSide = "South";
-                            case "South" -> oppSide = "North";
-                            case "Up" -> oppSide = "Down";
-                            case "Down" -> oppSide = "Up";
-                            default -> oppSide = side.toString();
-                        }
-                        for (Ref<EntityStore> target2 : nearbyBuffer) {
-                            Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), oppSide, new Vector3d(pos.x, pos.y, pos.z), target2, (ComponentAccessor<EntityStore>) entities, safeStack, Vector3d.ZERO, 0f);
-                            if (rs != null) { l.add(rs); try { visualMap.put(rs, safeStack); } catch (Exception ignored) {} }
-                        }
-                    }
-                    final short fSlot = slot;
-                    final int fNewQty = slotQty - transferAmount;
-                    final ItemStack fSlotItem = slotItem;
+                    if (!this.isItemAllowedByFilter(probeKey) || this.isSingletonMode() && slotQty <= 1) continue;
+                    int n = transferAmount = this.isSingletonMode() && (float)slotQty < this.data.tier * (float)Ev0Config.getTierMultiplier() ? slotQty - 1 : (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)slotQty);
+                    if (transferAmount <= 0 || !(t = this.getItemContainer().addItemStackToSlot((short)0, slotItem.withQuantity(transferAmount))).succeeded()) continue;
+                    short fSlot = slot;
+                    int fNewQty = slotQty - transferAmount;
+                    ItemStack fSlotItem = slotItem;
                     drawerContainer.writeAction(() -> {
                         drawerContainer.setSlot(fSlot, fSlotItem.withQuantity(fNewQty));
                         return null;
                     });
                     return true;
                 }
+                return false;
             }
-            return false;
-        }
-
-        for (int slot = 0; slot < sourceContainer.getCapacity(); slot++) {
-
-            ItemStack stack =
-                sourceContainer.getItemStack((short) slot);
-            if (stack == null) continue;
-
-            // Apply filter: skip items not allowed by filter (fast path)
-            String probeKey2 = null;
-            try { probeKey2 = stack.getBlockKey(); } catch (Throwable ignored) {}
-            if (probeKey2 == null) probeKey2 = resolveItemStackKey(stack);
-            if (!isItemAllowedByFilter(probeKey2)) {
-                continue;
-            }
-
-            int srcAvailable = stack.getQuantity();
-            // Singleton mode: leave at least 1 item in each source slot
-            if (isSingletonMode() && srcAvailable <= 1) continue;
-            int transferAmount =
-                isSingletonMode() && srcAvailable < data.tier * Ev0Config.getTierMultiplier() ? srcAvailable - 1 : (int) Math.min(data.tier * Ev0Config.getTierMultiplier(), srcAvailable);
-            if (transferAmount <= 0) continue;
-
-            ItemStack safeStack = stack.withQuantity(transferAmount);
-
-            ItemStackSlotTransaction t =
-                this.getItemContainer().addItemStackToSlot(
-                    (short) 0,
-                    safeStack
-                );
-
-            if (t.succeeded()) {
-
-            // Spawn visual if nearby players are present (uses tick-buffered list)
-            if (!nearbyBuffer.isEmpty()) {
-                String oppSide;
-                switch (side.toString()) {
-                    case "East" -> oppSide = "West";
-                    case "West" -> oppSide = "East";
-                    case "North" -> oppSide = "South";
-                    case "South" -> oppSide = "North";
-                    case "Up" -> oppSide = "Down";
-                    case "Down" -> oppSide = "Up";
-                    default -> oppSide = side.toString();
+            ItemStack have4 = this.getItemContainer().getItemStack((short)0);
+            if (have4 != null && have4.getQuantity() > 0) {
+                int room;
+                int actualTransfer;
+                int slotCap;
+                int slotQty;
+                ItemStack slotItem;
+                short slot;
+                int haveQty = have4.getQuantity();
+                if (this.isSingletonMode() && haveQty <= 1) {
+                    return false;
                 }
-                for (Ref<EntityStore> target2 : nearbyBuffer) {
-                    Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), oppSide, new Vector3d(pos.x, pos.y, pos.z), target2, (ComponentAccessor<EntityStore>) entities, safeStack, Vector3d.ZERO, 0f);
-                    if (rs != null) { l.add(rs); try { visualMap.put(rs, safeStack); } catch (Exception ignored) {} }
+                int transferAmount2 = this.isSingletonMode() && (float)haveQty < this.data.tier * (float)Ev0Config.getTierMultiplier() ? haveQty - 1 : (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)haveQty);
+                short matchedSlot = -1;
+                int matchedQty = 0;
+                int matchedCap = 0;
+                for (slot = 0; slot < drawerContainer.getSlotCount(); slot = (short)(slot + 1)) {
+                    slotItem = drawerContainer.getSlotItem(slot);
+                    if (ItemStack.isEmpty(slotItem) || !slotItem.isStackableWith(have4)) continue;
+                    slotQty = drawerContainer.getSlotQuantity(slot);
+                    slotCap = drawerContainer.getSlotStackCapacity(slot);
+                    if (slotCap - slotQty <= 0 || drawerContainer.testCantAddToSlot(slot, have4, slotItem)) continue;
+                    matchedSlot = slot;
+                    matchedQty = slotQty;
+                    matchedCap = slotCap;
+                    break;
                 }
-                if (drop) {
-                    if (!l.isEmpty()) {
-                        Ref<EntityStore> esx = l.getFirst();
-                        if (esx != null && esx.isValid()) {
-                            l.removeFirst();
-                            try { visualMap.remove(esx); } catch (Exception ignored) {}
-                            entities.removeEntity(esx, RemoveReason.REMOVE);
-                        }
+                if (matchedSlot == -1) {
+                    for (slot = 0; slot < drawerContainer.getSlotCount(); slot = (short)(slot + 1)) {
+                        slotItem = drawerContainer.getSlotItem(slot);
+                        if (!ItemStack.isEmpty(slotItem)) continue;
+                        slotQty = drawerContainer.getSlotQuantity(slot);
+                        slotCap = drawerContainer.getSlotStackCapacity(slot);
+                        if (slotCap - slotQty <= 0) continue;
+                        matchedSlot = slot;
+                        matchedQty = slotQty;
+                        matchedCap = slotCap;
+                        break;
                     }
                 }
-            }
-
-            sourceContainer.removeItemStackFromSlot(
-                (short) slot,
-                transferAmount
-            );
-
-            return true;
-            }
-        }
-
-        return false;
-    }
-
-
-    /**
-     * Scans the 1x1x1 space at {@code importPos} for dropped item entities and
-     * pulls them into this hopper's inventory, just like a vanilla hopper does
-     * when there is no input block present at that face.
-     */
-    private boolean tryPickupItemEntities(Vector3i importPos, Store<EntityStore> entities) {
-        perfInfo("[Hopper][Pickup] tryPickupItemEntities called at " + importPos);
-        final java.util.List rawResults = (java.util.List) SpatialResource.getThreadLocalReferenceList();
-        final Vector3d boxMin = new Vector3d(importPos.x, importPos.y, importPos.z);
-        final Vector3d boxMax = new Vector3d(importPos.x + 1.0, importPos.y + 1.0, importPos.z + 1.0);
-        perfInfo("[Hopper][Pickup] collectBox min=" + boxMin + " max=" + boxMax);
-        ((ComponentAccessor<EntityStore>) entities)
-            .getResource(EntityModule.get().getItemSpatialResourceType())
-            .getSpatialStructure()
-            .collectBox(boxMin, boxMax, rawResults);
-        perfInfo("[Hopper][Pickup] collectBox rawResults.size()=" + rawResults.size());
-        if (rawResults.isEmpty()) {
-            perfInfo("[Hopper][Pickup] no items found in box, returning false");
-            return false;
-        }
-
-        // Copy immediately — subsequent calls may reuse the same thread-local list.
-        List<Ref<EntityStore>> itemRefs = new ArrayList<>(rawResults);
-
-        int hopperQty = this.getItemContainer().getItemStack((short) 0) == null ? 0
-                : this.getItemContainer().getItemStack((short) 0).getQuantity();
-        perfInfo("[Hopper][Pickup] hopperQty=" + hopperQty + " itemRefs.size()=" + itemRefs.size());
-        if (hopperQty >= 100) {
-            perfInfo("[Hopper][Pickup] hopper full (qty=" + hopperQty + "), returning false");
-            return false;
-        }
-
-        for (Ref<EntityStore> ref : itemRefs) {
-            if (ref == null || !ref.isValid()) {
-                perfInfo("[Hopper][Pickup] ref null or invalid, skipping");
-                continue;
-            }
-            // Skip our own in-transit visual entities.
-            if (l.contains(ref)) {
-                perfInfo("[Hopper][Pickup] ref=" + ref + " is own visual, skipping");
-                continue;
-            }
-            // Note: NOT skipping Intangible entities — real dropped items may carry that component.
-            if (entities.getComponent(ref, Intangible.getComponentType()) != null) {
-                perfInfo("[Hopper][Pickup] ref=" + ref + " has Intangible (logging only, not skipping)");
-            }
-
-            ItemComponent ic = (ItemComponent) entities.getComponent(ref, ItemComponent.getComponentType());
-            if (ic == null) {
-                perfInfo("[Hopper][Pickup] ref=" + ref + " has no ItemComponent, skipping");
-                continue;
-            }
-
-            // Skip items still in their drop delay (not yet collectible).
-            if (!ic.canPickUp()) {
-                perfInfo("[Hopper][Pickup] ref=" + ref + " canPickUp()=false (drop delay active), skipping");
-                continue;
-            }
-
-            ItemStack stack = ic.getItemStack();
-            if (stack == null || stack.isEmpty()) {
-                perfInfo("[Hopper][Pickup] ref=" + ref + " stack is null or empty, skipping");
-                continue;
-            }
-
-            String itemKey = null;
-            try { itemKey = stack.getBlockKey(); } catch (Throwable ignored) {}
-            if (itemKey == null) itemKey = resolveItemStackKey(stack);
-            perfInfo("[Hopper][Pickup] ref=" + ref + " itemKey=" + itemKey + " qty=" + stack.getQuantity());
-
-            // Apply filter.
-            if (!isItemAllowedByFilter(itemKey)) {
-                perfInfo("[Hopper][Pickup] ref=" + ref + " BLOCKED by filter (mode=" + filterMode + ")");
-                continue;
-            }
-
-            int transferAmount = (int) Math.min(
-                    data.tier * Ev0Config.getTierMultiplier(),
-                    Math.min(stack.getQuantity(), 100 - hopperQty)
-            );
-            perfInfo("[Hopper][Pickup] transferAmount=" + transferAmount + " for " + itemKey);
-            if (transferAmount <= 0) {
-                perfInfo("[Hopper][Pickup] transferAmount<=0, skipping");
-                continue;
-            }
-
-            ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot(
-                    (short) 0, stack.withQuantity(transferAmount));
-
-            perfInfo("[Hopper][Pickup] addItemStackToSlot succeeded=" + t.succeeded() + " item=" + itemKey + " amount=" + transferAmount);
-            if (t.succeeded()) {
-                int remaining = stack.getQuantity() - transferAmount;
-                perfInfo("[Hopper][Pickup] SUCCESS item=" + itemKey + " transferred=" + transferAmount + " remaining=" + remaining);
-                if (remaining <= 0) {
-                    entities.removeEntity(ref, RemoveReason.REMOVE);
-                } else {
-                    // Capture position before the entity is removed, then re-drop the remainder.
-                    TransformComponent tc = entities.getComponent(ref, TransformComponent.getComponentType());
-                    Vector3d dropPos = tc != null ? tc.getPosition().clone()
-                            : new Vector3d(importPos.x + 0.5, importPos.y + 0.5, importPos.z + 0.5);
-                    entities.removeEntity(ref, RemoveReason.REMOVE);
-                    Holder<EntityStore> newHolder = ItemComponent.generateItemDrop(
-                            (ComponentAccessor<EntityStore>) entities,
-                            stack.withQuantity(remaining),
-                            dropPos, Vector3f.ZERO, 0, -1, 0
-                    );
-                    if (newHolder != null) {
-                        entities.addEntity(newHolder, AddReason.SPAWN);
+                if (matchedSlot != -1 && (actualTransfer = Math.min(transferAmount2, room = matchedCap - matchedQty)) > 0) {
+                    short fSlot = matchedSlot;
+                    int fNewQty = matchedQty + actualTransfer;
+                    int fActual = actualTransfer;
+                    ItemStack fHave = have4;
+                    drawerContainer.writeAction(() -> {
+                        drawerContainer.setSlot(fSlot, fHave.withQuantity(fNewQty));
+                        return null;
+                    });
+                    this.spawnVisualFor(have4.withQuantity(fActual), exportPhase, pos, side, entities);
+                    try {
+                        this.getItemContainer().removeItemStackFromSlot((short)0, fActual);
+                    } catch (Throwable th) {
                     }
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (!exportPhase) {
+            for (int slot = 0; slot < container.getCapacity(); ++slot) {
+                int transferAmount;
+                ItemStack stack = container.getItemStack((short)slot);
+                if (stack == null) continue;
+                String probeKey = null;
+                try {
+                    probeKey = stack.getBlockKey();
+                }
+                catch (Throwable transferAmount2) {
+                    // empty catch block
+                }
+                if (probeKey == null) {
+                    probeKey = this.resolveItemStackKey(stack);
+                }
+                if (!this.isItemAllowedByFilter(probeKey)) continue;
+                int srcAvailable = stack.getQuantity();
+                if (this.isSingletonMode() && srcAvailable <= 1) continue;
+                int n = transferAmount = this.isSingletonMode() && (float)srcAvailable < this.data.tier * (float)Ev0Config.getTierMultiplier() ? srcAvailable - 1 : (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)srcAvailable);
+                if (transferAmount <= 0) continue;
+                ItemStack safeStack = stack.withQuantity(transferAmount);
+                ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short)0, safeStack);
+                if (!t.succeeded()) continue;
+                container.removeItemStackFromSlot((short)slot, transferAmount);
+                return true;
+            }
+        }
+        if (exportPhase && (have = this.getItemContainer().getItemStack((short)0)) != null && have.getQuantity() > 0) {
+            int haveQty = have.getQuantity();
+            if (this.isSingletonMode() && haveQty <= 1) {
+                return false;
+            }
+            int transferAmount = this.isSingletonMode() && (float)haveQty < this.data.tier * (float)Ev0Config.getTierMultiplier() ? haveQty - 1 : (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)haveQty);
+            ItemStack safeStack = have.withQuantity(transferAmount);
+            for (int slot = 0; slot < container.getCapacity(); ++slot) {
+                ItemStackSlotTransaction t = container.addItemStackToSlot((short)slot, safeStack);
+                if (!t.succeeded()) continue;
+                this.spawnVisualFor(safeStack, exportPhase, pos, side, entities);
+                try {
+                    this.getItemContainer().removeItemStackFromSlot((short)0, transferAmount);
+                } catch (Throwable th) {
+                    container.removeItemStackFromSlot((short)slot, transferAmount);
+                    continue;
                 }
                 return true;
             }
         }
-        perfInfo("[Hopper][Pickup] no items collected at " + importPos + ", returning false");
         return false;
     }
 
-    // ── ArcIO helpers ─────────────────────────────────────────────────────────
-
-    /**
-     * Registers ArcIO's {@code BlockUUIDComponent} and {@code ArcioMechanismComponent}
-     * on this block entity so ArcIO can track signal state for it.
-     * Only runs once; subsequent calls are no-ops.
-     */
-    /**
-     * Ensures that the ArcIO UUID and mechanism components are attached to this block entity.
-     *
-     * @param commandBuffer When called from inside the tick-loop pass the tick's CommandBuffer so
-     *                      that putComponent() is deferred and does not migrate the archetype while
-     *                      the LegacyTickingBlockStateSystem is iterating it. Pass {@code null} when
-     *                      calling from outside the tick-loop (e.g. onOpen) to write directly.
-     */
-    private void ensureArcioComponents(World world, @Nullable CommandBuffer<ChunkStore> commandBuffer) {
-        if (arcioInitialized) return;
+    private void spawnVisualFor(ItemStack safeStack, boolean exportPhase, Vector3i pos, ConnectedBlockPatternRule.AdjacentSide side, Store<EntityStore> entities) {
+        List<Ref<EntityStore>> nearby;
+        Vector3d velocity;
+        if (safeStack == null || safeStack.isEmpty()) {
+            return;
+        }
+        Vector3i rel = WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition;
+        Vector3i hopperBlock = this.getBlockPosition();
+        Vector3d hopperCenter = new Vector3d((double)hopperBlock.x + 0.5 + 1.0, (double)hopperBlock.y + 0.5, (double)hopperBlock.z + 0.5);
+        Vector3d sourceCenter = new Vector3d((double)pos.x + 0.5 + 1.0, (double)pos.y + 0.5, (double)pos.z + 0.5);
+        Vector3d spawnPos = exportPhase ? hopperCenter : sourceCenter;
+        Vector3d vector3d = velocity = exportPhase ? new Vector3d((double)(-((Vector3i)((Object)rel)).x) * 0.35, 0.25, (double)(-((Vector3i)((Object)rel)).z) * 0.35) : new Vector3d((double)((Vector3i)((Object)rel)).x * 0.35, 0.25, (double)((Vector3i)((Object)rel)).z * 0.35);
+        if (exportPhase && !(nearby = this.nearbyBuffer).isEmpty()) {
+            boolean anySpawned = false;
+            for (Ref<EntityStore> targetRef : nearby) {
+                Ref<EntityStore> rs;
+                if ((rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), switch (side.toString()) {
+                    case "East" -> "West";
+                    case "West" -> "East";
+                    case "North" -> "South";
+                    case "South" -> "North";
+                    case "Up" -> "Down";
+                    case "Down" -> "Up";
+                    default -> side.toString();
+                }, new Vector3d((double)hopperBlock.x, (double)hopperBlock.y, (double)hopperBlock.z), targetRef, entities, safeStack, Vector3d.ZERO, 0.0f)) == null) continue;
+                this.l.add(rs);
+                try {
+                    this.visualMap.put(rs, safeStack);
+                    Instant now = entities != null ? entities.getResource(WorldTimeResource.getResourceType()).getGameTime() : Instant.now();
+                    this.visualSpawnTimes.put(rs, now);
+                }
+                catch (Exception exception) {
+                    // empty catch block
+                }
+                anySpawned = true;
+            }
+            if (anySpawned) {
+                return;
+            }
+        }
+        if (this.nearbyBuffer.isEmpty()) {
+            return;
+        }
+        Holder itemEntityHolder = ItemComponent.generateItemDrop(entities, (ItemStack)safeStack, (Vector3d)new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z), (Vector3f)Vector3f.ZERO, (float)0.0f, (float)-1.0f, (float)0.0f);
+        if (itemEntityHolder == null) {
+            return;
+        }
+        ItemComponent itemComponent = (ItemComponent) itemEntityHolder.getComponent(ItemComponent.getComponentType());
+        if (itemComponent != null) {
+            itemComponent.setPickupDelay(1.0E8f);
+            itemComponent.setRemovedByPlayerPickup(false);
+            itemComponent.computeDynamicLight();
+        }
         try {
-            Vector3i p = getBlockPosition();
-            int bx = p.x, by = p.y, bz = p.z;
+            ((PhysicsValues) itemEntityHolder.ensureAndGetComponent(PhysicsValues.getComponentType())).replaceValues(new PhysicsValues(0.0, 0.0, true));
+            ((Velocity) itemEntityHolder.ensureAndGetComponent(Velocity.getComponentType())).set(velocity.x, velocity.y, velocity.z);
+        }
+        catch (Exception exception) {
+            // empty catch block
+        }
+        try {
+            itemEntityHolder.tryRemoveComponent(BoundingBox.getComponentType());
+        }
+        catch (Exception exception) {
+            // empty catch block
+        }
+        try {
+            itemEntityHolder.ensureAndGetComponent(Intangible.getComponentType());
+        }
+        catch (Exception exception) {
+            // empty catch block
+        }
+        Ref<EntityStore> spawned = entities.addEntity(itemEntityHolder, AddReason.SPAWN);
+        if (spawned != null) {
+            TransformComponent tc = entities.getComponent(spawned, TransformComponent.getComponentType());
+            if (tc != null) {
+                tc.setPosition(new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z));
+            }
+            this.l.add(spawned);
+            try {
+                this.visualMap.put(spawned, safeStack);
+                Instant now = entities != null ? entities.getResource(WorldTimeResource.getResourceType()).getGameTime() : Instant.now();
+                this.visualSpawnTimes.put(spawned, now);
+            }
+            catch (Exception exception) {
+                // empty catch block
+            }
+        }
+    }
+
+    private void runExportPhase(Vector3i pos, Store<EntityStore> entities) {
+        int n;
+        ItemContainer ic = this.getItemContainer();
+        if (ic == null) {
+            return;
+        }
+        int cap = ic.getCapacity();
+        int foundSlot = -1;
+        ItemStack currentItemFast = null;
+        String fastKey = null;
+        for (int slotIdx = 0; slotIdx < cap; slotIdx++) {
+            ItemStack slotStack = ic.getItemStack((short)slotIdx);
+            if (slotStack == null) continue;
+            String key = null;
+            try {
+                key = slotStack.getBlockKey();
+            }
+            catch (Throwable throwable) {
+            }
+            if (key == null) {
+                key = this.resolveItemStackKey(slotStack);
+            }
+            if (this.isItemAllowedByFilter(key)) {
+                foundSlot = slotIdx;
+                currentItemFast = slotStack;
+                fastKey = key;
+                break;
+            }
+        }
+        if (currentItemFast == null || foundSlot < 0) {
+            return;
+        }
+        if (foundSlot != 0) {
+            try {
+                ItemStack slot0Stack = ic.getItemStack((short)0);
+                int foundQty = currentItemFast.getQuantity();
+                ic.removeItemStackFromSlot((short)foundSlot, foundQty);
+                if (slot0Stack != null) {
+                    int slot0Qty = slot0Stack.getQuantity();
+                    ic.removeItemStackFromSlot((short)0, slot0Qty);
+                    ic.addItemStackToSlot((short)foundSlot, slot0Stack);
+                }
+                ic.addItemStackToSlot((short)0, currentItemFast);
+            } catch (Throwable throwable) {
+                return;
+            }
+        }
+        ConnectedBlockPatternRule.AdjacentSide[] exportFaces = this.data.exportFaces;
+        int n2 = n = exportFaces == null ? 0 : exportFaces.length;
+        if (n <= 0) {
+            return;
+        }
+        int rrStart = Math.floorMod(this.exportFaceCursor, n);
+        for (int i = 0; i < n; ++i) {
+            String itemKey;
+            ConnectedBlockPatternRule.AdjacentSide side = exportFaces[(rrStart + i) % n];
+            boolean exportedThisFace = false;
+            Vector3i exportPos = new Vector3i(pos.x + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).x, pos.y + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).y, pos.z + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).z);
+            WorldChunk chunk = this.w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(exportPos.x, exportPos.z));
+            if (chunk == null) continue;
+            Object state = EngineCompat.getState(chunk, exportPos.x, exportPos.y, exportPos.z);
+            int targetFluidId = EngineCompat.getFluidId(chunk, exportPos.x, exportPos.y, exportPos.z);
+            boolean hasContainer = state != null && (state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") || state.getClass().getSimpleName().contains("ItemContainer") || this.getItemContainerFromState(state) != null) || state == null && this.getContainerViaECS(exportPos) != null;
+            ItemStack currentItem = this.getItemContainer().getItemStack((short)0);
+            if (Ev0Config.isFluidTransferEnabled() && currentItem != null && !hasContainer && targetFluidId != 0 && (itemKey = currentItem.getBlockKey()) != null && itemKey.contains("Bucket") && !itemKey.contains("Empty")) {
+                int fluidToPlace = 0;
+                if (itemKey.contains("Water")) {
+                    fluidToPlace = 7;
+                } else if (itemKey.contains("Lava")) {
+                    fluidToPlace = 6;
+                } else if (itemKey.contains("Green_Slime")) {
+                    fluidToPlace = 5;
+                } else if (itemKey.contains("Poison")) {
+                    fluidToPlace = 4;
+                } else if (itemKey.contains("Tar")) {
+                    fluidToPlace = 3;
+                } else if (itemKey.contains("Red_Slime")) {
+                    fluidToPlace = 2;
+                }
+                if (fluidToPlace != 0) {
+                    this.itemContainer.removeItemStackFromSlot((short)0, 1);
+                    this.itemContainer.addItemStackToSlot((short)0, new ItemStack("Container_Bucket", 1, null));
+                    exportedThisFace = true;
+                }
+            }
+            boolean transferred = !exportedThisFace && this.tryTransferToOrFromContainer(state, exportPos, side, entities, true);
+            boolean bl = exportedThisFace = exportedThisFace || transferred;
+            if (!(exportedThisFace || transferred || currentItem == null || hasContainer || targetFluidId != 0)) {
+                if (this.isSingletonMode() && currentItem.getQuantity() <= 1) continue;
+                if (EngineCompat.getBlockType(chunk, exportPos.x, exportPos.y, exportPos.z) == null) {
+                    EngineCompat.setBlock(chunk, exportPos.x, exportPos.y, exportPos.z, currentItem.getBlockKey());
+                    try {
+                        this.getItemContainer().removeItemStackFromSlot((short)0, 1);
+                    } catch (Throwable th) {
+                        EngineCompat.setBlock(chunk, exportPos.x, exportPos.y, exportPos.z, BlockType.EMPTY);
+                        continue;
+                    }
+                    exportedThisFace = true;
+                }
+            }
+            if (!exportedThisFace) continue;
+            this.exportFaceCursor = Math.floorMod(rrStart + i + 1, n);
+            if (this.data.exportOnce) break;
+        }
+    }
+
+    private boolean handleExport(World world, Store<EntityStore> entities) {
+        int transferAmount;
+        ItemStack source = this.getItemContainer().getItemStack((short)0);
+        if (source == null) {
+            return false;
+        }
+        int srcQty = source.getQuantity();
+        if (this.isSingletonMode() && srcQty <= 1) {
+            return false;
+        }
+        int n = transferAmount = this.isSingletonMode() && (float)srcQty < this.data.tier * 2.0f ? srcQty - 1 : (int)Math.min(this.data.tier * 2.0f, (float)srcQty);
+        if (transferAmount <= 0) {
+            return false;
+        }
+        Vector3i basePos = this.getBlockPosition();
+        BlockPosition pos = world.getBaseBlock(new BlockPosition(basePos.x, basePos.y, basePos.z));
+        for (ConnectedBlockPatternRule.AdjacentSide side : this.data.exportFaces) {
+            Vector3i targetPos = new Vector3i(pos.x + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).x, pos.y + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).y, pos.z + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).z);
+            WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(targetPos.x, targetPos.z));
+            if (chunk == null) continue;
+            if (this.tryExportToContainer(chunk, targetPos, source, transferAmount)) {
+                return true;
+            }
+            if (!this.tryExportToWorld(chunk, targetPos, source, transferAmount)) continue;
+            return true;
+        }
+        return false;
+    }
+
+    private boolean tryExportToContainer(WorldChunk chunk, Vector3i pos, ItemStack source, int amount) {
+        Object state = EngineCompat.getState(chunk, pos.x, pos.y, pos.z);
+        if (state != null && state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState")) {
+            int transferAmount;
+            Object bench = state;
+            ItemStack sourcex = this.getItemContainer().getItemStack((short)0);
+            if (sourcex == null) {
+                return false;
+            }
+            int srcxQty = sourcex.getQuantity();
+            if (this.isSingletonMode() && srcxQty <= 1) {
+                return false;
+            }
+            int n = transferAmount = this.isSingletonMode() && (float)srcxQty < this.data.tier * 2.0f ? srcxQty - 1 : (int)Math.min(this.data.tier * 2.0f, (float)srcxQty);
+            if (transferAmount <= 0) {
+                return false;
+            }
+            ItemStack safeStack = sourcex.withQuantity(transferAmount);
+            if (!this.isItemAllowedByFilter(safeStack.getBlockKey())) {
+                return false;
+            }
+            for (int c = 0; c <= 1; ++c) {
+                ItemContainer input = this.getContainerFromItemContainerObject(this.getItemContainerFromState(bench), c);
+                if (input == null) continue;
+                for (int slot = 0; slot < input.getCapacity(); ++slot) {
+                    ItemStackSlotTransaction t = input.addItemStackToSlot((short)slot, safeStack);
+                    if (!t.succeeded()) continue;
+                    try {
+                        this.getItemContainer().removeItemStackFromSlot((short)0, transferAmount);
+                    } catch (Throwable th) {
+                        input.removeItemStackFromSlot((short)slot, transferAmount);
+                        continue;
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+        Object containerStateObj = null;
+        try {
+            Method m = state.getClass().getMethod("getItemContainer", new Class[0]);
+            containerStateObj = m.invoke(state, new Object[0]);
+        }
+        catch (Throwable m) {
+            // empty catch block
+        }
+        if (containerStateObj == null) {
+            return false;
+        }
+        ItemContainer target = (ItemContainer)containerStateObj;
+        for (int slot = 0; slot < target.getCapacity(); ++slot) {
+            if (!this.isItemAllowedByFilter(source.getBlockKey())) {
+                return false;
+            }
+            ItemStackSlotTransaction t = target.addItemStackToSlot((short)slot, source.withQuantity(amount));
+            if (!t.succeeded()) continue;
+            try {
+                this.getItemContainer().removeItemStackFromSlot((short)0, amount);
+            } catch (Throwable th) {
+                target.removeItemStackFromSlot((short)slot, amount);
+                continue;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private boolean tryExportToWorld(WorldChunk chunk, Vector3i pos, ItemStack source, int amount) {
+        int fluidId;
+        if (!this.isItemAllowedByFilter(source.getBlockKey())) {
+            return false;
+        }
+        if (EngineCompat.getBlockType(chunk, pos.x, pos.y, pos.z) == null && (fluidId = EngineCompat.getFluidId(chunk, pos.x, pos.y, pos.z)) != 0) {
+            block16: {
+                EngineCompat.setBlock(chunk, pos.x, pos.y, pos.z, source.getBlockKey());
+                if (EngineCompat.getBlockType(chunk, pos.x, pos.y, pos.z) == null) break block16;
+                try {
+                    this.getItemContainer().removeItemStackFromSlot((short)0, amount);
+                } catch (Throwable th) {
+                    EngineCompat.setBlock(chunk, pos.x, pos.y, pos.z, BlockType.EMPTY);
+                    break block16;
+                }
+                try {
+                    if (this.l == null || this.l.isEmpty() || this.es == null) break block16;
+                    Iterator<Ref<EntityStore>> it = this.l.iterator();
+                    while (it.hasNext()) {
+                        Ref<EntityStore> ref = it.next();
+                        try {
+                            if (ref != null && ref.isValid()) {
+                                TransformComponent tc = this.es.getComponent(ref, TransformComponent.getComponentType());
+                                if (tc == null) continue;
+                                Vector3d p = tc.getPosition();
+                                if (!(Math.abs(p.x - ((double)pos.x + 0.5)) < 0.6) || !(Math.abs(p.y - ((double)pos.y + 0.5)) < 0.6) || !(Math.abs(p.z - ((double)pos.z + 0.5)) < 0.6)) continue;
+                                it.remove();
+                                try {
+                                    this.visualMap.remove(ref);
+                                }
+                                catch (Exception exception) {
+                                    // empty catch block
+                                }
+                                try {
+                                    this.visualSpawnTimes.remove(ref);
+                                }
+                                catch (Exception exception) {
+                                    // empty catch block
+                                }
+                                try {
+                                    this.es.removeEntity(ref, RemoveReason.REMOVE);
+                                }
+                                catch (Exception exception) {}
+                                continue;
+                            }
+                            it.remove();
+                            try {
+                                this.visualMap.remove(ref);
+                                this.visualSpawnTimes.remove(ref);
+                            }
+                            catch (Exception exception) {
+                            }
+                        }
+                        catch (Exception exception) {}
+                    }
+                }
+                catch (Exception exception) {
+                    // empty catch block
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleImport(World world, Store<EntityStore> entities) {
+        Vector3i basePos = this.getBlockPosition();
+        BlockPosition pos = world.getBaseBlock(new BlockPosition(basePos.x, basePos.y, basePos.z));
+        for (ConnectedBlockPatternRule.AdjacentSide side : this.data.importFaces) {
+            Vector3i targetPos = new Vector3i(pos.x + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).x, pos.y + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).y, pos.z + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).z);
+            WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(targetPos.x, targetPos.z));
+            if (chunk == null || !this.tryImportFromContainer(chunk, targetPos, entities, side)) continue;
+            return true;
+        }
+        return false;
+    }
+
+    /*
+     * WARNING - void declaration
+     */
+    private boolean tryImportFromContainer(WorldChunk chunk, Vector3i pos, Store<EntityStore> entities, ConnectedBlockPatternRule.AdjacentSide side) {
+        ItemStack destStack = this.getItemContainer().getItemStack((short)0);
+        if (destStack != null && destStack.getQuantity() >= 100) {
+            return false;
+        }
+        Object state = EngineCompat.getState(chunk, pos.x, pos.y, pos.z);
+        if (state != null && state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState")) {
+            ItemContainer output = this.getContainerFromItemContainerObject(this.getItemContainerFromState(state), 2);
+            if (output == null) {
+                return false;
+            }
+            int outCap = output.getCapacity();
+            for (int slot = 0; slot < outCap; ++slot) {
+                Ref<EntityStore> ref;
+                ItemStackSlotTransaction t;
+                int transferAmount;
+                ItemStack stack = output.getItemStack((short)slot);
+                if (stack == null) continue;
+                String blockKey = null;
+                try {
+                    blockKey = stack.getBlockKey();
+                }
+                catch (Throwable throwable) {
+                    // empty catch block
+                }
+                if (blockKey == null) {
+                    blockKey = this.resolveItemStackKey(stack);
+                }
+                if (!this.isItemAllowedByFilter(blockKey)) continue;
+                int available = stack.getQuantity();
+                if (this.isSingletonMode() && available <= 1) continue;
+                int n = transferAmount = this.isSingletonMode() && (float)available < this.data.tier * (float)Ev0Config.getTierMultiplier() ? available - 1 : (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)available);
+                if (transferAmount <= 0 || !(t = this.getItemContainer().addItemStackToSlot((short)0, stack.withQuantity(transferAmount))).succeeded()) continue;
+                Vector3i relRot = WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition;
+                Vector3d velRot = new Vector3d((double)((Vector3i)((Object)relRot)).x * 0.35, 0.25, (double)((Vector3i)((Object)relRot)).z * 0.35);
+                Vector3i hopperBlock = this.getBlockPosition();
+                Vector3d vector3d = new Vector3d((double)hopperBlock.x + 0.5, (double)hopperBlock.y + 0.5, (double)hopperBlock.z + 0.5);
+                if (this.drop && !this.l.isEmpty() && this.l.getFirst() != null && (ref = this.l.getFirst()).isValid()) {
+                    this.l.removeFirst();
+                    try {
+                        this.visualMap.remove(ref);
+                        this.visualSpawnTimes.remove(ref);
+                    }
+                    catch (Exception exception) {
+                        // empty catch block
+                    }
+                    entities.removeEntity(ref, RemoveReason.REMOVE);
+                }
+                output.removeItemStackFromSlot((short)slot, transferAmount);
+                return true;
+            }
+            return false;
+        }
+        if (state instanceof HopperProcessor) {
+            HopperProcessor otherHopper = (HopperProcessor)state;
+            int otherCap = otherHopper.getItemContainer().getCapacity();
+            for (int n = 0; n < otherCap; ++n) {
+                ItemStack taken;
+                ItemStackSlotTransaction t;
+                int transferAmount;
+                ItemStack otherStack = otherHopper.getItemContainer().getItemStack((short)n);
+                if (otherStack == null) continue;
+                String otherKey = null;
+                try {
+                    otherKey = otherStack.getBlockKey();
+                }
+                catch (Throwable available) {
+                    // empty catch block
+                }
+                if (otherKey == null) {
+                    otherKey = this.resolveItemStackKey(otherStack);
+                }
+                if (!this.isItemAllowedByFilter(otherKey)) continue;
+                int otherAvailable = otherStack.getQuantity();
+                if (this.isSingletonMode() && otherAvailable <= 1) continue;
+                int n2 = transferAmount = this.isSingletonMode() && (float)otherAvailable < this.data.tier * (float)Ev0Config.getTierMultiplier() ? otherAvailable - 1 : (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)otherAvailable);
+                if (transferAmount <= 0 || !(t = this.getItemContainer().addItemStackToSlot((short)0, otherStack.withQuantity(transferAmount))).succeeded()) continue;
+                if (!this.nearbyBuffer.isEmpty() && (taken = this.getItemContainer().getItemStack((short)0)) != null && !taken.isEmpty()) {
+                    for (Ref<EntityStore> targetRef : this.nearbyBuffer) {
+                        Ref<EntityStore> ref = ItemUtilsExtended.throwItem(this.getBlockType().getId(), side.toString(), new Vector3d((double)pos.x, (double)pos.y, (double)pos.z), targetRef, entities, taken, Vector3d.ZERO, 0.0f);
+                        if (ref == null) continue;
+                        this.l.add(ref);
+                        try {
+                            this.visualMap.put(ref, taken);
+                            Instant instant = this.es != null ? this.es.getResource(WorldTimeResource.getResourceType()).getGameTime() : Instant.now();
+                            this.visualSpawnTimes.put(ref, instant);
+                        }
+                        catch (Exception exception) {}
+                    }
+                }
+                otherHopper.getItemContainer().removeItemStackFromSlot((short)n, transferAmount);
+                return true;
+            }
+            return false;
+        }
+        Object containerStateObj = null;
+        try {
+            Method m = state.getClass().getMethod("getItemContainer", new Class[0]);
+            containerStateObj = m.invoke(state, new Object[0]);
+        }
+        catch (Throwable m) {
+            // empty catch block
+        }
+        if (containerStateObj == null) {
+            ItemContainer ecsContainer = this.getContainerViaECS(pos);
+            if (ecsContainer != null) {
+                for (int slot = 0; slot < ecsContainer.getCapacity(); ++slot) {
+                    ItemStackSlotTransaction t;
+                    int transferAmount;
+                    ItemStack stack = ecsContainer.getItemStack((short)slot);
+                    if (stack == null) continue;
+                    String probeKey = null;
+                    try {
+                        probeKey = stack.getBlockKey();
+                    }
+                    catch (Throwable otherAvailable) {
+                        // empty catch block
+                    }
+                    if (probeKey == null) {
+                        probeKey = this.resolveItemStackKey(stack);
+                    }
+                    if (!this.isItemAllowedByFilter(probeKey)) continue;
+                    int srcAvailable = stack.getQuantity();
+                    if (this.isSingletonMode() && srcAvailable <= 1) continue;
+                    int n = transferAmount = this.isSingletonMode() && (float)srcAvailable < this.data.tier * (float)Ev0Config.getTierMultiplier() ? srcAvailable - 1 : (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)srcAvailable);
+                    if (transferAmount <= 0 || !(t = this.getItemContainer().addItemStackToSlot((short)0, stack.withQuantity(transferAmount))).succeeded()) continue;
+                    ecsContainer.removeItemStackFromSlot((short)slot, transferAmount);
+                    return true;
+                }
+            }
+            return false;
+        }
+        ItemContainer sourceContainer = (ItemContainer)containerStateObj;
+        if (SIMPLE_DRAWERS_PRESENT && sourceContainer instanceof IDrawerContainer) {
+            IDrawerContainer drawerContainer = (IDrawerContainer)((Object)sourceContainer);
+            for (short slot = 0; slot < drawerContainer.getSlotCount(); slot = (short)(slot + 1)) {
+                int transferAmount;
+                ItemStack slotItem = drawerContainer.getSlotItem(slot);
+                int slotQty = drawerContainer.getSlotQuantity(slot);
+                if (slotItem == null || slotQty <= 0) continue;
+                String probeKey2 = null;
+                try {
+                    probeKey2 = slotItem.getBlockKey();
+                }
+                catch (Throwable t) {
+                    // empty catch block
+                }
+                if (probeKey2 == null) {
+                    probeKey2 = this.resolveItemStackKey(slotItem);
+                }
+                if (!this.isItemAllowedByFilter(probeKey2) || this.isSingletonMode() && slotQty <= 1) continue;
+                int n = transferAmount = this.isSingletonMode() && (float)slotQty < this.data.tier * (float)Ev0Config.getTierMultiplier() ? slotQty - 1 : (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)slotQty);
+                if (transferAmount <= 0) continue;
+                ItemStack safeStack = slotItem.withQuantity(transferAmount);
+                ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short)0, safeStack);
+                if (!t.succeeded()) continue;
+                if (!this.nearbyBuffer.isEmpty()) {
+                    String oppSide = switch ((ConnectedBlockPatternRule.AdjacentSide) side) {
+                        case East -> "West";
+                        case West -> "East";
+                        case North -> "South";
+                        case South -> "North";
+                        case Up -> "Down";
+                        case Down -> "Up";
+                        default -> side.toString();
+                    };
+                    for (Ref<EntityStore> ref : this.nearbyBuffer) {
+                        Ref<EntityStore> rs = ItemUtilsExtended.throwItem(this.getBlockType().getId(), oppSide, new Vector3d((double)pos.x, (double)pos.y, (double)pos.z), ref, entities, safeStack, Vector3d.ZERO, 0.0f);
+                        if (rs == null) continue;
+                        this.l.add(rs);
+                        try {
+                            this.visualMap.put(rs, safeStack);
+                        }
+                        catch (Exception exception) {}
+                    }
+                }
+                short fSlot = slot;
+                int fNewQty = slotQty - transferAmount;
+                ItemStack fSlotItem = slotItem;
+                drawerContainer.writeAction(() -> {
+                    drawerContainer.setSlot(fSlot, fSlotItem.withQuantity(fNewQty));
+                    return null;
+                });
+                return true;
+            }
+            return false;
+        }
+        for (int slot = 0; slot < sourceContainer.getCapacity(); ++slot) {
+            int transferAmount;
+            ItemStack stack = sourceContainer.getItemStack((short)slot);
+            if (stack == null) continue;
+            String probeKey2 = null;
+            try {
+                probeKey2 = stack.getBlockKey();
+            }
+            catch (Throwable slotQty) {
+                // empty catch block
+            }
+            if (probeKey2 == null) {
+                probeKey2 = this.resolveItemStackKey(stack);
+            }
+            if (!this.isItemAllowedByFilter(probeKey2)) continue;
+            int srcAvailable = stack.getQuantity();
+            if (this.isSingletonMode() && srcAvailable <= 1) continue;
+            int n = transferAmount = this.isSingletonMode() && (float)srcAvailable < this.data.tier * (float)Ev0Config.getTierMultiplier() ? srcAvailable - 1 : (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)srcAvailable);
+            if (transferAmount <= 0) continue;
+            ItemStack safeStack = stack.withQuantity(transferAmount);
+            ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short)0, safeStack);
+            if (!t.succeeded()) continue;
+            if (!this.nearbyBuffer.isEmpty()) {
+                String oppSide = switch ((ConnectedBlockPatternRule.AdjacentSide) side) {
+                    case East -> "West";
+                    case West -> "East";
+                    case North -> "South";
+                    case South -> "North";
+                    case Up -> "Down";
+                    case Down -> "Up";
+                    default -> side.toString();
+                };
+                for (Ref<EntityStore> ref : this.nearbyBuffer) {
+                    Ref<EntityStore> ref2 = ItemUtilsExtended.throwItem(this.getBlockType().getId(), oppSide, new Vector3d((double)pos.x, (double)pos.y, (double)pos.z), ref, entities, safeStack, Vector3d.ZERO, 0.0f);
+                    if (ref2 == null) continue;
+                    this.l.add(ref2);
+                    try {
+                        this.visualMap.put(ref2, safeStack);
+                    }
+                    catch (Exception exception) {}
+                }
+                Ref<EntityStore> esx;
+                if (this.drop && !this.l.isEmpty() && (esx = this.l.getFirst()) != null && esx.isValid()) {
+                    this.l.removeFirst();
+                    try {
+                        this.visualMap.remove(esx);
+                    }
+                    catch (Exception exception) {
+                        // empty catch block
+                    }
+                    entities.removeEntity(esx, RemoveReason.REMOVE);
+                }
+            }
+            sourceContainer.removeItemStackFromSlot((short)slot, transferAmount);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean tryPickupItemEntities(Vector3i importPos, Store<EntityStore> entities) {
+        HopperProcessor.perfInfo("[Hopper][Pickup] tryPickupItemEntities called at " + String.valueOf(importPos));
+        List rawResults = SpatialResource.getThreadLocalReferenceList();
+        Vector3d boxMin = new Vector3d((double)importPos.x, (double)importPos.y, (double)importPos.z);
+        Vector3d boxMax = new Vector3d((double)importPos.x + 1.0, (double)importPos.y + 1.0, (double)importPos.z + 1.0);
+        HopperProcessor.perfInfo("[Hopper][Pickup] collectBox min=" + String.valueOf(boxMin) + " max=" + String.valueOf(boxMax));
+        entities.getResource(EntityModule.get().getItemSpatialResourceType()).getSpatialStructure().collectBox(boxMin, boxMax, rawResults);
+        HopperProcessor.perfInfo("[Hopper][Pickup] collectBox rawResults.size()=" + rawResults.size());
+        if (rawResults.isEmpty()) {
+            HopperProcessor.perfInfo("[Hopper][Pickup] no items found in box, returning false");
+            return false;
+        }
+        ArrayList itemRefs = new ArrayList(rawResults);
+        int hopperQty = this.getItemContainer().getItemStack((short)0) == null ? 0 : this.getItemContainer().getItemStack((short)0).getQuantity();
+        HopperProcessor.perfInfo("[Hopper][Pickup] hopperQty=" + hopperQty + " itemRefs.size()=" + itemRefs.size());
+        if (hopperQty >= 100) {
+            HopperProcessor.perfInfo("[Hopper][Pickup] hopper full (qty=" + hopperQty + "), returning false");
+            return false;
+        }
+        for (Ref ref : (java.util.ArrayList<Ref>) (java.util.ArrayList) itemRefs) {
+            ItemComponent ic;
+            if (ref == null || !ref.isValid()) {
+                HopperProcessor.perfInfo("[Hopper][Pickup] ref null or invalid, skipping");
+                continue;
+            }
+            if (this.l.contains(ref)) {
+                HopperProcessor.perfInfo("[Hopper][Pickup] ref=" + String.valueOf(ref) + " is own visual, skipping");
+                continue;
+            }
+            if (entities.getComponent(ref, Intangible.getComponentType()) != null) {
+                HopperProcessor.perfInfo("[Hopper][Pickup] ref=" + String.valueOf(ref) + " has Intangible (logging only, not skipping)");
+            }
+            if ((ic = entities.getComponent(ref, ItemComponent.getComponentType())) == null) {
+                HopperProcessor.perfInfo("[Hopper][Pickup] ref=" + String.valueOf(ref) + " has no ItemComponent, skipping");
+                continue;
+            }
+            if (!ic.canPickUp()) {
+                HopperProcessor.perfInfo("[Hopper][Pickup] ref=" + String.valueOf(ref) + " canPickUp()=false (drop delay active), skipping");
+                continue;
+            }
+            ItemStack stack = ic.getItemStack();
+            if (stack == null || stack.isEmpty()) {
+                HopperProcessor.perfInfo("[Hopper][Pickup] ref=" + String.valueOf(ref) + " stack is null or empty, skipping");
+                continue;
+            }
+            String itemKey = null;
+            try {
+                itemKey = stack.getBlockKey();
+            }
+            catch (Throwable throwable) {
+                // empty catch block
+            }
+            if (itemKey == null) {
+                itemKey = this.resolveItemStackKey(stack);
+            }
+            HopperProcessor.perfInfo("[Hopper][Pickup] ref=" + String.valueOf(ref) + " itemKey=" + itemKey + " qty=" + stack.getQuantity());
+            if (!this.isItemAllowedByFilter(itemKey)) {
+                HopperProcessor.perfInfo("[Hopper][Pickup] ref=" + String.valueOf(ref) + " BLOCKED by filter (mode=" + this.filterMode + ")");
+                continue;
+            }
+            int transferAmount = (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)Math.min(stack.getQuantity(), 100 - hopperQty));
+            HopperProcessor.perfInfo("[Hopper][Pickup] transferAmount=" + transferAmount + " for " + itemKey);
+            if (transferAmount <= 0) {
+                HopperProcessor.perfInfo("[Hopper][Pickup] transferAmount<=0, skipping");
+                continue;
+            }
+            ItemStackSlotTransaction t = this.getItemContainer().addItemStackToSlot((short)0, stack.withQuantity(transferAmount));
+            HopperProcessor.perfInfo("[Hopper][Pickup] addItemStackToSlot succeeded=" + t.succeeded() + " item=" + itemKey + " amount=" + transferAmount);
+            if (!t.succeeded()) continue;
+            int remaining = stack.getQuantity() - transferAmount;
+            HopperProcessor.perfInfo("[Hopper][Pickup] SUCCESS item=" + itemKey + " transferred=" + transferAmount + " remaining=" + remaining);
+            if (remaining <= 0) {
+                entities.removeEntity(ref, RemoveReason.REMOVE);
+            } else {
+                TransformComponent tc = entities.getComponent(ref, TransformComponent.getComponentType());
+                Vector3d dropPos = tc != null ? tc.getPosition().clone() : new Vector3d((double)importPos.x + 0.5, (double)importPos.y + 0.5, (double)importPos.z + 0.5);
+                entities.removeEntity(ref, RemoveReason.REMOVE);
+                Holder newHolder = ItemComponent.generateItemDrop(entities, (ItemStack)stack.withQuantity(remaining), (Vector3d)dropPos, (Vector3f)Vector3f.ZERO, (float)0.0f, (float)-1.0f, (float)0.0f);
+                if (newHolder != null) {
+                    entities.addEntity(newHolder, AddReason.SPAWN);
+                }
+            }
+            return true;
+        }
+        HopperProcessor.perfInfo("[Hopper][Pickup] no items collected at " + String.valueOf(importPos) + ", returning false");
+        return false;
+    }
+
+    private void ensureArcioComponents(World world, @Nullable CommandBuffer<ChunkStore> commandBuffer) {
+        if (this.arcioInitialized) {
+            return;
+        }
+        try {
+            ArcioMechanismComponent mech;
+            Vector3i p = this.getBlockPosition();
+            int bx = p.x;
+            int by = p.y;
+            int bz = p.z;
             Store<ChunkStore> cs = world.getChunkStore().getStore();
             Ref<ChunkStore> chunkRef = world.getChunkStore().getChunkReference(ChunkUtil.indexChunkFromBlock(bx, bz));
-            if (chunkRef == null) return;
-            BlockComponentChunk bcc = (BlockComponentChunk) cs.getComponent(chunkRef, BlockComponentChunk.getComponentType());
-            if (bcc == null) return;
+            if (chunkRef == null) {
+                return;
+            }
+            BlockComponentChunk bcc = cs.getComponent(chunkRef, BlockComponentChunk.getComponentType());
+            if (bcc == null) {
+                return;
+            }
             Ref<ChunkStore> blockRef = bcc.getEntityReference(ChunkUtil.indexBlockInColumn(bx, by, bz));
-            if (blockRef == null) return;
-            BlockUUIDComponent uuid = (BlockUUIDComponent) cs.getComponent(blockRef, BlockUUIDComponent.getComponentType());
+            if (blockRef == null) {
+                return;
+            }
+            BlockUUIDComponent uuid = cs.getComponent(blockRef, BlockUUIDComponent.getComponentType());
             if (uuid == null) {
                 uuid = BlockUUIDComponent.randomUUID();
                 uuid.setPosition(new Vector3i(bx, by, bz));
@@ -1837,8 +1974,7 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                 }
                 ArcioPlugin.get().putUUID(uuid.getUuid(), blockRef);
             }
-            ArcioMechanismComponent mech = (ArcioMechanismComponent) cs.getComponent(blockRef, ArcioMechanismComponent.getComponentType());
-            if (mech == null) {
+            if ((mech = cs.getComponent(blockRef, ArcioMechanismComponent.getComponentType())) == null) {
                 mech = new ArcioMechanismComponent("Hopper", 0, 1);
                 if (commandBuffer != null) {
                     commandBuffer.putComponent(blockRef, ArcioMechanismComponent.getComponentType(), mech);
@@ -1846,123 +1982,107 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                     cs.putComponent(blockRef, ArcioMechanismComponent.getComponentType(), mech);
                 }
             }
-            arcioInitialized = true;
-        } catch (Exception e) {
+            this.arcioInitialized = true;
+        }
+        catch (Exception e) {
             Ev0Log.warn(HytaleLogger.getLogger(), "[Hopper] Failed to ensure ArcIO components: " + e.getMessage());
         }
     }
 
-    /**
-     * Returns {@code true} when the ArcIO signal on this block's own mechanism
-     * meets the required threshold, or when an adjacent block with an active
-     * ArcIO mechanism is found.
-     */
     private boolean isArcioActive(World world) {
         try {
-            Vector3i p = getBlockPosition();
-            int bx = p.x, by = p.y, bz = p.z;
+            ArcioMechanismComponent mech;
+            Ref<ChunkStore> blockRef;
+            BlockComponentChunk bcc;
+            Vector3i p = this.getBlockPosition();
+            int bx = p.x;
+            int by = p.y;
+            int bz = p.z;
             Store<ChunkStore> cs = world.getChunkStore().getStore();
             Ref<ChunkStore> chunkRef = world.getChunkStore().getChunkReference(ChunkUtil.indexChunkFromBlock(bx, bz));
-            if (chunkRef != null) {
-                BlockComponentChunk bcc = (BlockComponentChunk) cs.getComponent(chunkRef, BlockComponentChunk.getComponentType());
-                if (bcc != null) {
-                    Ref<ChunkStore> blockRef = bcc.getEntityReference(ChunkUtil.indexBlockInColumn(bx, by, bz));
-                    if (blockRef != null) {
-                        ArcioMechanismComponent mech = (ArcioMechanismComponent) cs.getComponent(blockRef, ArcioMechanismComponent.getComponentType());
-                        if (mech != null && mech.getStrongestInputSignal(world) > 0) return true;
-                    }
-                }
+            if (chunkRef != null && (bcc = cs.getComponent(chunkRef, BlockComponentChunk.getComponentType())) != null && (blockRef = bcc.getEntityReference(ChunkUtil.indexBlockInColumn(bx, by, bz))) != null && (mech = cs.getComponent(blockRef, ArcioMechanismComponent.getComponentType())) != null && mech.getStrongestInputSignal(world) > 0) {
+                return true;
             }
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             Ev0Log.warn(HytaleLogger.getLogger(), "[Hopper] ArcIO signal check failed: " + e.getMessage());
         }
-        return hasAdjacentActiveArcioMechanism(world);
+        return this.hasAdjacentActiveArcioMechanism(world);
     }
 
-    /** Checks the six orthogonal neighbors for an active ArcIO mechanism. */
     private boolean hasAdjacentActiveArcioMechanism(World world) {
         try {
+            int[][] offsets;
             Store<ChunkStore> cs = world.getChunkStore().getStore();
-            Vector3i p = getBlockPosition();
-            int bx = p.x, by = p.y, bz = p.z;
-            int[][] offsets = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-            for (int[] off : offsets) {
-                int nx = bx + off[0], ny = by + off[1], nz = bz + off[2];
+            Vector3i p = this.getBlockPosition();
+            int bx = p.x;
+            int by = p.y;
+            int bz = p.z;
+            for (int[] off : offsets = new int[][]{{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}) {
+                ArcioMechanismComponent mc;
+                Ref<ChunkStore> blockRef;
+                BlockComponentChunk bcc;
+                int nx = bx + off[0];
+                int ny = by + off[1];
+                int nz = bz + off[2];
                 Ref<ChunkStore> chunkRef = world.getChunkStore().getChunkReference(ChunkUtil.indexChunkFromBlock(nx, nz));
-                if (chunkRef == null) continue;
-                BlockComponentChunk bcc = (BlockComponentChunk) cs.getComponent(chunkRef, BlockComponentChunk.getComponentType());
-                if (bcc == null) continue;
-                Ref<ChunkStore> blockRef = bcc.getEntityReference(ChunkUtil.indexBlockInColumn(nx, ny, nz));
-                if (blockRef == null) continue;
-                ArcioMechanismComponent mc = (ArcioMechanismComponent) cs.getComponent(blockRef, ArcioMechanismComponent.getComponentType());
-                if (mc != null && mc.getStrongestInputSignal(world) > 0) return true;
+                if (chunkRef == null || (bcc = cs.getComponent(chunkRef, BlockComponentChunk.getComponentType())) == null || (blockRef = bcc.getEntityReference(ChunkUtil.indexBlockInColumn(nx, ny, nz))) == null || (mc = cs.getComponent(blockRef, ArcioMechanismComponent.getComponentType())) == null || mc.getStrongestInputSignal(world) <= 0) continue;
+                return true;
             }
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             Ev0Log.warn(HytaleLogger.getLogger(), "[Hopper] ArcIO adjacent check failed: " + e.getMessage());
         }
         return false;
     }
 
     protected void reset(Instant currentTime) {
-        startTime = currentTime;
+        this.startTime = currentTime;
     }
+
     @Nonnull
-    public static List<Ref<EntityStore>> getAllEntitiesInBox(HopperProcessor hp, Vector3i pos, float height, @Nonnull ComponentAccessor<EntityStore> components,  boolean players, boolean entities, boolean items) {
-        final java.util.List results = (java.util.List) SpatialResource.getThreadLocalReferenceList();
-        final Vector3d center = new Vector3d(pos.x, pos.y, pos.z);
-
-        // Use the provided height parameter (caller-controlled) rather than hardcoded values.
-        final double queryHeight = Math.max(1.0f, height);
-
+    public static List<Ref<EntityStore>> getAllEntitiesInBox(HopperProcessor hp, Vector3i pos, float height, @Nonnull ComponentAccessor<EntityStore> components, boolean players, boolean entities, boolean items) {
+        List results = SpatialResource.getThreadLocalReferenceList();
+        Vector3d center = new Vector3d((double)pos.x, (double)pos.y, (double)pos.z);
+        double queryHeight = Math.max(1.0f, height);
         if (entities) {
-            // If you later want to query entities, enable and tune radius/height here.
-            // components.getResource(EntityModule.get().getEntitySpatialResourceType()).getSpatialStructure().collectCylinder(center, 2, queryHeight, results);
+            // empty if block
         }
         if (players) {
-            components.getResource(EntityModule.get().getPlayerSpatialResourceType()).getSpatialStructure().collectCylinder(center, 4, queryHeight, results);
+            components.getResource(EntityModule.get().getPlayerSpatialResourceType()).getSpatialStructure().collectCylinder(center, 4.0, queryHeight, results);
         }
         if (items) {
-            // items typically don't need as large a radius; tune if necessary
-            // components.getResource(EntityModule.get().getItemSpatialResourceType()).getSpatialStructure().collectCylinder(center, 2, queryHeight, results);
+            // empty if block
         }
-
-        // Prefer reusing the instance buffer when available to avoid allocating a new list each tick.
         if (hp != null && hp.nearbyBuffer != null) {
             hp.nearbyBuffer.clear();
             hp.nearbyBuffer.addAll(results);
             return hp.nearbyBuffer;
         }
-
-        // Return a copy so callers iterating the result are not affected if the
-        // thread-local list is reused by a nested spatial query (e.g. inside throwItem).
-        return new ArrayList<>(results);
+        return new ArrayList<Ref<EntityStore>>(results);
     }
-    public static List<Ref<EntityStore>> getAllItemsInBox(HopperProcessor hp, Vector3i pos, float height, @Nonnull ComponentAccessor<EntityStore> components,  boolean players, boolean entities, boolean items) {
-        final java.util.List results = (java.util.List) SpatialResource.getThreadLocalReferenceList();
-        final Vector3d center = new Vector3d(pos.x, pos.y, pos.z);
-        final double queryHeight = Math.max(0.5f, height);
 
+    public static List<Ref<EntityStore>> getAllItemsInBox(HopperProcessor hp, Vector3i pos, float height, @Nonnull ComponentAccessor<EntityStore> components, boolean players, boolean entities, boolean items) {
+        List results = SpatialResource.getThreadLocalReferenceList();
+        Vector3d center = new Vector3d((double)pos.x, (double)pos.y, (double)pos.z);
+        double queryHeight = Math.max(0.5f, height);
         if (entities) {
-            final Vector3d min = new Vector3d(pos.x - 0.5, pos.y - 0.5, pos.z - 0.5);
-            final Vector3d max = new Vector3d(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
+            Vector3d min = new Vector3d((double)pos.x - 0.5, (double)pos.y - 0.5, (double)pos.z - 0.5);
+            Vector3d max = new Vector3d((double)pos.x + 0.5, (double)pos.y + 0.5, (double)pos.z + 0.5);
             components.getResource(EntityModule.get().getEntitySpatialResourceType()).getSpatialStructure().collectBox(min, max, results);
         }
         if (players) {
-            // tuned out by default; enable/adjust if visuals should affect players
-            // components.getResource(EntityModule.get().getPlayerSpatialResourceType()).getSpatialStructure().collectCylinder(center, 4, queryHeight, results );
+            // empty if block
         }
         if (items) {
-            // Use a tighter radius/height for item queries to reduce returned set size
-            components.getResource(EntityModule.get().getItemSpatialResourceType()).getSpatialStructure().collectCylinder(center, 2, Math.max(0.5, queryHeight), results );
+            components.getResource(EntityModule.get().getItemSpatialResourceType()).getSpatialStructure().collectCylinder(center, 2.0, Math.max(0.5, queryHeight), results);
         }
-
         if (hp != null && hp.nearbyBuffer != null) {
             hp.nearbyBuffer.clear();
             hp.nearbyBuffer.addAll(results);
             return hp.nearbyBuffer;
         }
-
-        return new ArrayList<>(results);
+        return new ArrayList<Ref<EntityStore>>(results);
     }
 
     public static ComponentType<EntityStore, BlockEntity> getComponentType() {
@@ -1970,95 +2090,54 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
         return EntityModule.get().getBlockEntityComponentType();
     }
 
-    public static class Data extends StateData {
-
-        @Nonnull
-        public static final BuilderCodec<Data> CODEC = BuilderCodec.builder(Data.class, Data::new)
-                .append(new KeyedCodec<>("Force", Codec.FLOAT), (o, v) -> o.force = v, o -> o.force)
-                .documentation("How much force to push the mob with.")
-                .add()
-                .append(new KeyedCodec<>("Height", Codec.FLOAT), (o, v) -> o.height = v, o -> o.height)
-                .documentation("How high should the conveyor search?")
-                .add()
-                .append(new KeyedCodec<>("Tier", Codec.FLOAT), (o, v) -> o.tier = v, o -> o.tier)
-                .documentation("How high should the conveyor search?")
-                .add()
-                .append(new KeyedCodec<>("Players", Codec.BOOLEAN), (o, v) -> o.players = v, o -> o.players)
-                .documentation("Should players be affected?")
-                .add()
-                .append(new KeyedCodec<>("Items", Codec.BOOLEAN), (o, v) -> o.items = v, o -> o.items)
-                .documentation("Should items be affected?")
-                .add()
-                .append(new KeyedCodec<>("Entities", Codec.BOOLEAN), (o, v) -> o.entities = v, o -> o.entities)
-                .documentation("Should entities be affected?")
-                .add()
-                .appendInherited(new KeyedCodec<>("Output", ItemHandler.CODEC), (i, v) -> i.output = v, i -> i.output, (o, p) -> o.output = p.output)
-                .documentation("Provides the items to be inserted into the container.")
-                .add()
-
-                .appendInherited(new KeyedCodec<>("ExportFaces", Codecs.SIDE_ARRAY), (i, v) -> i.exportFaces = v, i -> i.exportFaces, (o, p) -> o.exportFaces = p.exportFaces)
-                .documentation("The adjacent faces to attempt exporting into.")
-                .add()
-
-                .appendInherited(new KeyedCodec<>("ExportOnce", Codec.BOOLEAN), (i, v) -> i.exportOnce = v, i -> i.exportOnce, (o, p) -> o.exportOnce = p.exportOnce)
-                .documentation("Should the generator only export items to the first valid side that accepts items?")
-                .add()
-                .append(new KeyedCodec<>("Substitutions", Codec.STRING_ARRAY, true), (i,v) ->i.substitutions = v, i -> i.substitutions)
-                .add()
-
-
-                .appendInherited(new KeyedCodec<>("Cooldown", ProtocolCodecs.RANGEF), (i, v) -> i.duration = v, i -> i.duration, (o, p) -> o.duration = p.duration)
-                .documentation("A range that determines the cooldown before the next item is generated.")
-                .add()
-                .appendInherited(new KeyedCodec<>("ImportFaces", Codecs.SIDE_ARRAY), (i, v) -> i.importFaces = v, i -> i.importFaces, (o, p) -> o.importFaces = p.importFaces)
-                .documentation("A range that determines the cooldown before the next item is generated.")
-                .add()
-                .build();
-        public float tier = 1;
-        public float force = 1f;
-        public boolean players = true;
-        public boolean entities = true;
-        public boolean items = true;
-        public float height = 0.99f;
-        public ItemHandler output = new IdOutput();
-        public AdjacentSide[] exportFaces = new AdjacentSide[0];
-        public AdjacentSide[] importFaces = new AdjacentSide[0];
-        public String[] substitutions;
-        public boolean exportOnce = true;
-        public Rangef duration;
-    }
-
     @Override
     @Nullable
     public WorldChunk getChunk() {
         try {
-            Vector3i p = getPosition();
-            if (p == null || w == null) return null;
-            return w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(p.x, p.z));
-        } catch (Throwable ignored) {
+            Vector3i p = this.getPosition();
+            if (p == null || this.w == null) {
+                return null;
+            }
+            return this.w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(p.x, p.z));
+        }
+        catch (Throwable ignored) {
             return null;
         }
     }
 
     @Override
     public Vector3i getPosition() {
-        try { return this.getBlockPosition(); } catch (Throwable ignored) { return null; }
+        try {
+            return this.getBlockPosition();
+        }
+        catch (Throwable ignored) {
+            return null;
+        }
     }
 
     @Override
     public void invalidate() {
         this.invalidatedFlag = true;
-        try { REGISTERED_PROCESSORS.remove(this); } catch (Throwable ignored) {}
-        try { lastEngineTick = 0; } catch (Throwable ignored) {}
+        try {
+            REGISTERED_PROCESSORS.remove(this);
+        }
+        catch (Throwable throwable) {
+            // empty catch block
+        }
+        try {
+            this.lastEngineTick = 0L;
+        }
+        catch (Throwable throwable) {
+            // empty catch block
+        }
     }
 
-    // Lightweight maintenance task invoked by fallback scheduler when engine ticks are absent.
     private void fallbackHeartbeat() {
-        try {
-            // clean up stale visual entities (same logic as in tick but safe-guarded)
-            if (this.es != null && !visualSpawnTimes.isEmpty()) {
+        block14: {
+            try {
+                if (this.es == null || this.visualSpawnTimes.isEmpty()) break block14;
                 Instant now = this.es.getResource(WorldTimeResource.getResourceType()).getGameTime();
-                Iterator<Map.Entry<Ref<EntityStore>, Instant>> it2 = visualSpawnTimes.entrySet().iterator();
+                Iterator<Map.Entry<Ref<EntityStore>, Instant>> it2 = this.visualSpawnTimes.entrySet().iterator();
                 while (it2.hasNext()) {
                     Map.Entry<Ref<EntityStore>, Instant> e = it2.next();
                     Ref<EntityStore> ref = e.getKey();
@@ -2066,22 +2145,41 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
                     try {
                         if (ref == null || !ref.isValid()) {
                             it2.remove();
-                            try { visualMap.remove(ref); } catch (Exception ignored) {}
+                            try {
+                                this.visualMap.remove(ref);
+                            }
+                            catch (Exception exception) {}
                             continue;
                         }
-                        if (now.isAfter(spawnTime.plusSeconds(5))) {
-                            it2.remove();
-                            try { visualMap.remove(ref); } catch (Exception ignored) {}
-                            try { l.remove(ref); } catch (Exception ignored) {}
-                            try { this.es.removeEntity(ref, RemoveReason.REMOVE); } catch (Exception ignored) {}
+                        if (!now.isAfter(spawnTime.plusSeconds(5L))) continue;
+                        it2.remove();
+                        try {
+                            this.visualMap.remove(ref);
                         }
-                    } catch (Exception ignored) {}
+                        catch (Exception exception) {
+                            // empty catch block
+                        }
+                        try {
+                            this.l.remove(ref);
+                        }
+                        catch (Exception exception) {
+                            // empty catch block
+                        }
+                        try {
+                            this.es.removeEntity(ref, RemoveReason.REMOVE);
+                        }
+                        catch (Exception exception) {
+                        }
+                    }
+                    catch (Exception exception) {}
                 }
             }
-        } catch (Throwable ignored) {}
+            catch (Throwable throwable) {
+                // empty catch block
+            }
+        }
     }
 
-    // ------------------------- Reflection helpers -------------------------
     private Object getRefFromArchetype(ArchetypeChunk<?> archeChunk, int index) {
         try {
             String key = "ArchetypeChunk.getRef";
@@ -2089,60 +2187,189 @@ public class HopperProcessor implements TickableBlockState, ItemContainerBlockSt
             if (m == null) {
                 Class<?> ac = archeChunk.getClass();
                 for (String name : new String[]{"getReferenceTo", "getRef", "getRefAt", "referenceTo", "getReference"}) {
-                    try { m = ac.getMethod(name, int.class); break; } catch (NoSuchMethodException ignored) {}
+                    try {
+                        m = ac.getMethod(name, Integer.TYPE);
+                        break;
+                    }
+                    catch (NoSuchMethodException noSuchMethodException) {
+                    }
                 }
-                if (m != null) REFLECTION_METHOD_CACHE.put(key, m);
+                if (m != null) {
+                    REFLECTION_METHOD_CACHE.put(key, m);
+                }
             }
-            if (m != null) return m.invoke(archeChunk, index);
-        } catch (Throwable ignored) {}
+            if (m != null) {
+                return m.invoke(archeChunk, index);
+            }
+        }
+        catch (Throwable throwable) {
+            // empty catch block
+        }
         return null;
     }
 
     private HopperComponent getHopperComponent(Store<ChunkStore> store, Object ref) {
         try {
             Ev0Lib lib = Ev0Lib.getInstance();
-            if (lib == null) return null;
-            Object compType = lib.getHopperComponentType();
-            if (compType == null) return null;
+            if (lib == null) {
+                return null;
+            }
+            ComponentType<ChunkStore, HopperComponent> compType = lib.getHopperComponentType();
+            if (compType == null) {
+                return null;
+            }
             Method getter = null;
             for (Method mm : store.getClass().getMethods()) {
-                if (!mm.getName().equals("getComponent")) continue;
-                if (mm.getParameterCount() == 2) { getter = mm; break; }
+                if (!mm.getName().equals("getComponent") || mm.getParameterCount() != 2) continue;
+                getter = mm;
+                break;
             }
-            if (getter == null) return null;
+            if (getter == null) {
+                return null;
+            }
             Object comp = getter.invoke(store, ref, compType);
-            if (comp instanceof HopperComponent) return (HopperComponent) comp;
-        } catch (Throwable ignored) {}
+            if (comp instanceof HopperComponent) {
+                return (HopperComponent)comp;
+            }
+        }
+        catch (Throwable throwable) {
+            // empty catch block
+        }
         return null;
     }
 
     private void putHopperComponent(Store<ChunkStore> store, Object ref, HopperComponent comp) {
         try {
             Method put = null;
-            for (Method mm : store.getClass().getMethods()) {
-                if (!mm.getName().equals("putComponent")) continue;
-                if (mm.getParameterCount() == 2) { put = mm; break; }
+            for (Method method : store.getClass().getMethods()) {
+                if (!method.getName().equals("putComponent") || method.getParameterCount() != 2) continue;
+                put = method;
+                break;
             }
-            if (put != null) { put.invoke(store, ref, comp); return; }
-
+            if (put != null) {
+                put.invoke(store, ref, comp);
+                return;
+            }
             Ev0Lib lib = Ev0Lib.getInstance();
-            if (lib == null) return;
-            Object compType = lib.getHopperComponentType();
-            if (compType == null) return;
+            if (lib == null) {
+                return;
+            }
+            ComponentType<ChunkStore, HopperComponent> compType = lib.getHopperComponentType();
+            if (compType == null) {
+                return;
+            }
             Method ensure = null;
             for (Method mm : store.getClass().getMethods()) {
-                if (mm.getName().equals("ensureAndGetComponent") && mm.getParameterCount() == 2) { ensure = mm; break; }
+                if (!mm.getName().equals("ensureAndGetComponent") || mm.getParameterCount() != 2) continue;
+                ensure = mm;
+                break;
             }
             if (ensure != null) {
-                Object existing = ensure.invoke(store, ref, compType);
-                if (existing == null) return;
+                Object object = ensure.invoke(store, ref, compType);
+                if (object == null) {
+                    return;
+                }
                 try {
-                    java.lang.reflect.Field f = existing.getClass().getField("data");
-                    f.set(existing, comp.data);
-                } catch (Throwable ignored) {}
+                    Field f = object.getClass().getField("data");
+                    f.set(object, comp.data);
+                }
+                catch (Throwable throwable) {}
             }
-        } catch (Throwable ignored) {}
+        }
+        catch (Throwable throwable) {
+            // empty catch block
+        }
     }
 
+    static {
+        FALLBACK_SCHEDULER.scheduleAtFixedRate(() -> {
+            long now = System.currentTimeMillis();
+            for (HopperProcessor hp : REGISTERED_PROCESSORS.keySet()) {
+                try {
+                    long last = hp.lastEngineTick;
+                    if (hp.invalidatedFlag) {
+                        REGISTERED_PROCESSORS.remove(hp);
+                        continue;
+                    }
+                    if (now - last <= 2000L) continue;
+                    try {
+                        hp.fallbackHeartbeat();
+                    }
+                    catch (Throwable throwable) {
+                    }
+                }
+                catch (Throwable throwable) {}
+            }
+        }, 2L, 2L, TimeUnit.SECONDS);
+        KNOWN_CONTAINER_COMP_TYPES = null;
+        boolean found = false;
+        try {
+            Class.forName("voidbond.arcio.components.ArcioMechanismComponent");
+            found = true;
+        }
+        catch (ClassNotFoundException classNotFoundException) {
+            // empty catch block
+        }
+        ARCIO_PRESENT = found;
+        found = false;
+        try {
+            Class.forName("net.crepe.inventory.IDrawerContainer");
+            found = true;
+        }
+        catch (ClassNotFoundException classNotFoundException) {
+            // empty catch block
+        }
+        SIMPLE_DRAWERS_PRESENT = found;
+        QUERY = Query.and(FluidSection.getComponentType(), ChunkSection.getComponentType());
+        DEPENDENCIES = Set.of(new SystemDependency(Order.AFTER, FluidSystems.Ticking.class), new SystemDependency(Order.BEFORE, ChunkBlockTickSystem.Ticking.class));
+    }
+
+    public static class Data
+    extends StateData {
+        @Nonnull
+        public static final BuilderCodec<Data> CODEC = BuilderCodec.builder(Data.class, Data::new)
+            .append(new KeyedCodec<Float>("Force", Codec.FLOAT), (i, v) -> { ((Data)i).force = ((Float)v).floatValue(); }, i -> Float.valueOf(((Data)i).force)).add()
+            .append(new KeyedCodec<Float>("Height", Codec.FLOAT), (i, v) -> { ((Data)i).height = ((Float)v).floatValue(); }, i -> Float.valueOf(((Data)i).height)).add()
+            .append(new KeyedCodec<Float>("Tier", Codec.FLOAT), (i, v) -> { ((Data)i).tier = ((Float)v).floatValue(); }, i -> Float.valueOf(((Data)i).tier)).add()
+            .append(new KeyedCodec<Boolean>("Players", Codec.BOOLEAN), (i, v) -> { ((Data)i).players = (Boolean)v; }, i -> ((Data)i).players).add()
+            .append(new KeyedCodec<Boolean>("Items", Codec.BOOLEAN), (i, v) -> { ((Data)i).items = (Boolean)v; }, i -> ((Data)i).items).add()
+            .append(new KeyedCodec<Boolean>("Entities", Codec.BOOLEAN), (i, v) -> { ((Data)i).entities = (Boolean)v; }, i -> ((Data)i).entities).add()
+            .append(new KeyedCodec<ItemHandler>("Output", ItemHandler.CODEC), (i, v) -> { ((Data)i).output = (ItemHandler)v; }, i -> ((Data)i).output).add()
+            .append(new KeyedCodec<ConnectedBlockPatternRule.AdjacentSide[]>("ExportFaces", Codecs.SIDE_ARRAY), (i, v) -> { ((Data)i).exportFaces = (ConnectedBlockPatternRule.AdjacentSide[])v; }, i -> ((Data)i).exportFaces).add()
+            .append(new KeyedCodec<Boolean>("ExportOnce", Codec.BOOLEAN), (i, v) -> { ((Data)i).exportOnce = (Boolean)v; }, i -> ((Data)i).exportOnce).add()
+            .append(new KeyedCodec<String[]>("Substitutions", Codec.STRING_ARRAY, true), (i, v) -> { ((Data)i).substitutions = (String[])v; }, i -> ((Data)i).substitutions).add()
+            .append(new KeyedCodec<Rangef>("Cooldown", ProtocolCodecs.RANGEF), (i, v) -> { ((Data)i).duration = (Rangef)v; }, i -> ((Data)i).duration).add()
+            .append(new KeyedCodec<ConnectedBlockPatternRule.AdjacentSide[]>("ImportFaces", Codecs.SIDE_ARRAY), (i, v) -> { ((Data)i).importFaces = (ConnectedBlockPatternRule.AdjacentSide[])v; }, i -> ((Data)i).importFaces).add()
+            .build();
+        public float tier = 1.0f;
+        public float force = 1.0f;
+        public boolean players = true;
+        public boolean entities = true;
+        public boolean items = true;
+        public float height = 0.99f;
+        public ItemHandler output = new IdOutput();
+        public ConnectedBlockPatternRule.AdjacentSide[] exportFaces = new ConnectedBlockPatternRule.AdjacentSide[0];
+        public ConnectedBlockPatternRule.AdjacentSide[] importFaces = new ConnectedBlockPatternRule.AdjacentSide[0];
+        public String[] substitutions;
+        public boolean exportOnce = true;
+        public Rangef duration;
+        public String hopperType = "Normal";
+        public String wirelessName = "";
+        public int wirelessTargetX = Integer.MIN_VALUE;
+        public int wirelessTargetY = Integer.MIN_VALUE;
+        public int wirelessTargetZ = Integer.MIN_VALUE;
+
+        public void setWirelessTarget(@Nullable Vector3i target) {
+            if (target == null) {
+                this.wirelessTargetX = Integer.MIN_VALUE;
+                this.wirelessTargetY = Integer.MIN_VALUE;
+                this.wirelessTargetZ = Integer.MIN_VALUE;
+            } else {
+                this.wirelessTargetX = target.x;
+                this.wirelessTargetY = target.y;
+                this.wirelessTargetZ = target.z;
+            }
+        }
+    }
 }
 

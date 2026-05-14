@@ -1,26 +1,34 @@
+/*
+ * Decompiled with CFR 0.152.
+ */
 package org.Ev0Mods.plugin.api;
 
 import com.hypixel.hytale.logger.HytaleLogger;
+import org.Ev0Mods.plugin.api.Ev0Config;
 
-/**
- * Centralized logging wrapper that only forwards logs when enabled in Ev0Config.
- */
 public final class Ev0Log {
-
-    private Ev0Log() {}
+    private Ev0Log() {
+    }
 
     public static void info(HytaleLogger logger, String message) {
-        if (!Ev0Config.isLoggingEnabled()) return;
-        logger.atInfo().log(message);
+        if (!Ev0Config.isLoggingEnabled()) {
+            return;
+        }
+        ((HytaleLogger.Api)logger.atInfo()).log(message);
     }
 
     public static void warn(HytaleLogger logger, String message) {
-        if (!Ev0Config.isLoggingEnabled()) return;
-        logger.atWarning().log(message);
+        if (!Ev0Config.isLoggingEnabled()) {
+            return;
+        }
+        ((HytaleLogger.Api)logger.atWarning()).log(message);
     }
 
     public static void error(HytaleLogger logger, String message) {
-        if (!Ev0Config.isLoggingEnabled()) return;
-        logger.atWarning().log(message);
+        if (!Ev0Config.isLoggingEnabled()) {
+            return;
+        }
+        ((HytaleLogger.Api)logger.atWarning()).log(message);
     }
 }
+

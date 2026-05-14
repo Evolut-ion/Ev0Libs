@@ -1,26 +1,24 @@
+/*
+ * Decompiled with CFR 0.152.
+ */
 package com.hypixel.hytale.server.core.universe.world.chunk.state;
 
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
-import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.math.vector.Vector3i;
-
+import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
+import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import javax.annotation.Nullable;
 
-/** Minimal local stub to allow compiling against engine-less classpath.
- *  At runtime the engine's interface will be present; this stub matches
- *  the methods used by the plugin.
- */
 public interface TickableBlockState {
-    void tick(float dt, int index, ArchetypeChunk<ChunkStore> archeChunk,
-              Store<ChunkStore> store, CommandBuffer<ChunkStore> commandBuffer);
+    public void tick(float var1, int var2, ArchetypeChunk<ChunkStore> var3, Store<ChunkStore> var4, CommandBuffer<ChunkStore> var5);
 
     @Nullable
-    WorldChunk getChunk();
+    public WorldChunk getChunk();
 
-    Vector3i getPosition();
+    public Vector3i getPosition();
 
-    void invalidate();
+    public void invalidate();
 }
+
