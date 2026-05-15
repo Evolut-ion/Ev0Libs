@@ -6,6 +6,45 @@ package org.Ev0Mods.plugin.api.component;
 import java.lang.reflect.Method;
 
 public class EngineCompat {
+    private static volatile boolean blockTypeReflectionDone = false;
+    private static Method blockTypeGetAssetMap = null;
+    private static Method assetMapGetIndexOrDefault = null;
+
+    /**
+     * Returns true if key is a registered block type.
+     * Uses BlockType.getAssetMap().getIndexOrDefault(key, -1) >= 0.
+     * Fails open (true) only if reflection itself cannot locate the methods.
+     */
+    public static boolean isValidBlockKey(String key) {
+        if (key == null || key.isEmpty()) return false;
+        if (!blockTypeReflectionDone) {
+            synchronized (EngineCompat.class) {
+                if (!blockTypeReflectionDone) {
+                    try {
+                        Class<?> btClass = Class.forName(
+                            "com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType");
+                        blockTypeGetAssetMap = btClass.getMethod("getAssetMap");
+                        Object sampleMap = blockTypeGetAssetMap.invoke(null);
+                        if (sampleMap != null) {
+                            assetMapGetIndexOrDefault = sampleMap.getClass()
+                                .getMethod("getIndexOrDefault", Object.class, int.class);
+                        }
+                    } catch (Throwable ignored) {}
+                    blockTypeReflectionDone = true;
+                }
+            }
+        }
+        if (blockTypeGetAssetMap != null && assetMapGetIndexOrDefault != null) {
+            try {
+                Object map = blockTypeGetAssetMap.invoke(null);
+                if (map == null) return true;
+                Object idx = assetMapGetIndexOrDefault.invoke(map, key, -1);
+                return idx instanceof Integer && (Integer) idx >= 0;
+            } catch (Throwable ignored) {}
+        }
+        return true; // fail open only when reflection itself is unavailable
+    }
+
     private static Method findMethod(Class<?> cls, String ... names) {
         for (String name : names) {
             try {

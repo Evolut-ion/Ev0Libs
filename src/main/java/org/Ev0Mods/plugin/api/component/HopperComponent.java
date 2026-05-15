@@ -839,6 +839,10 @@ TickableBlockState {
         if (!this.hasFacade() || store == null || pos == null) {
             return;
         }
+        if (!EngineCompat.isValidBlockKey(this.facadeBlockId)) {
+            this.facadeBlockId = "";
+            return;
+        }
         this.despawnFacadeEntity(store);
         try {
             TimeResource timeRes = store.getResource(TimeResource.getResourceType());
@@ -981,41 +985,32 @@ TickableBlockState {
         }
         try {
             Object probe = null;
-            try {
-                probe = stack.getBlockKey();
-            }
-            catch (Throwable throwable) {
-                // empty catch block
-            }
-            if (probe == null) {
-                Class<?> cls = stack.getClass();
-                Method m = ITEM_KEY_METHOD_CACHE.get(cls);
-                if (m == null && !ITEM_KEY_METHOD_CACHE.containsKey(cls)) {
-                    String[] candidates;
-                    Method found = null;
-                    for (String name : candidates = new String[]{"getItemId", "getItemKey", "getId", "getKey", "getName", "getBlockKey"}) {
-                        try {
-                            found = cls.getMethod(name, new Class[0]);
-                            if (found == null) continue;
-                            break;
-                        }
-                        catch (Throwable throwable) {
-                            // empty catch block
-                        }
-                    }
-                    ITEM_KEY_METHOD_CACHE.put(cls, found);
-                    m = found;
-                }
-                if (m != null) {
+            Class<?> cls = stack.getClass();
+            Method m = ITEM_KEY_METHOD_CACHE.get(cls);
+            if (m == null && !ITEM_KEY_METHOD_CACHE.containsKey(cls)) {
+                Method found = null;
+                for (String name : new String[]{"getItemId", "getItemKey", "getId", "getKey", "getName"}) {
                     try {
-                        Object v = m.invoke((Object)stack, new Object[0]);
-                        if (v != null) {
-                            probe = v;
-                        }
+                        found = cls.getMethod(name, new Class[0]);
+                        if (found == null) continue;
+                        break;
                     }
                     catch (Throwable throwable) {
                         // empty catch block
                     }
+                }
+                ITEM_KEY_METHOD_CACHE.put(cls, found);
+                m = found;
+            }
+            if (m != null) {
+                try {
+                    Object v = m.invoke((Object)stack, new Object[0]);
+                    if (v != null) {
+                        probe = v;
+                    }
+                }
+                catch (Throwable throwable) {
+                    // empty catch block
                 }
             }
             if (probe == null) {
@@ -1515,6 +1510,9 @@ TickableBlockState {
                 this.timerV = 0.0;
             }
             ++this.tickCounter;
+            if (this.tickCounter == 1 && this.hasFacade() && !EngineCompat.isValidBlockKey(this.facadeBlockId)) {
+                this.facadeBlockId = "";
+            }
             int phase = this.tickCounter % 90;
             boolean doExport = phase == 0;
             boolean bl2 = doImport = phase == 45;
@@ -2458,13 +2456,7 @@ TickableBlockState {
                             return false;
                         }
                         ItemStack safeStack = have.withQuantity(transferAmount);
-                        String haveKey = null;
-                        try {
-                            haveKey = have.getBlockKey();
-                        }
-                        catch (Throwable transferAmount2) {
-                            // empty catch block
-                        }
+                        String haveKey = this.resolveItemStackKey(have);
                         if (!this.isItemAllowedByFilter(haveKey)) {
                             return false;
                         }

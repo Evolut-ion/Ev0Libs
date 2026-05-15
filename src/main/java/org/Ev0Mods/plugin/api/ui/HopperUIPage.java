@@ -322,7 +322,7 @@ public final class HopperUIPage {
             });
         }
         if ("Facade".equals(activeTab)) {
-            if (heldDisplay != null) {
+            if (heldDisplay != null && EngineCompat.isValidBlockKey(heldDisplay)) {
                 String heldIdFacade = heldDisplay;
                 builder.addEventListener("setFacadeHeld", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
                     Store<EntityStore> s = liveStore(playerRef, store);
@@ -515,7 +515,7 @@ public final class HopperUIPage {
         String tabNav = "            <div class=\"tab-nav\">\n                <button id=\"prevTab\" class=\"tab-arrow\">&lt;</button>\n                <p class=\"tab-label\">%s</p>\n                <button id=\"nextTab\" class=\"tab-arrow\">&gt;</button>\n            </div>\n            <div class=\"separator\"></div>\n".formatted(HopperUIPage.escapeHtml(activeTab.toUpperCase()));
         String content = switch (activeTab) {
             case "Filter" -> HopperUIPage.buildFilterTab(wlText, blText, heldItem);
-            case "Facade" -> HopperUIPage.buildFacadeTab(facadeBlockId, facadeConnectionMask, facadeRotation, facadeRotationX, facadeRotationZ, heldItem);
+            case "Facade" -> HopperUIPage.buildFacadeTab(facadeBlockId, facadeConnectionMask, facadeRotation, facadeRotationX, facadeRotationZ, EngineCompat.isValidBlockKey(heldItem) ? heldItem : null);
             case "Signals" -> HopperUIPage.buildSignalsTab(showArcio, arcioMode);
             case "Links" -> HopperUIPage.buildLinksTab(wirelessName, linkTargetText, linkCandidates, channelOwner, channelPasscode, isChannelOwner);
             default -> HopperUIPage.buildStatusTab(mode, hopperSlot, hasItem);
