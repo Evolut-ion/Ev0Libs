@@ -28,8 +28,8 @@ import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.spatial.SpatialResource;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.util.ChunkUtil;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
 import com.hypixel.hytale.math.vector.Vector3i;
 import com.hypixel.hytale.protocol.BlockPosition;
 import com.hypixel.hytale.protocol.Rangef;
@@ -333,8 +333,10 @@ TickableBlockState {
             return null;
         }
         try {
+            long chunkIdx = ChunkUtil.indexChunkFromBlock(p.x, p.z);
+            if (this.w.getChunkIfInMemory(chunkIdx) == null) return null;
             Store<ChunkStore> cs = this.w.getChunkStore().getStore();
-            Ref<ChunkStore> chunkRef = this.w.getChunkStore().getChunkReference(ChunkUtil.indexChunkFromBlock(p.x, p.z));
+            Ref<ChunkStore> chunkRef = this.w.getChunkStore().getChunkReference(chunkIdx);
             if (chunkRef == null) {
                 return null;
             }
@@ -427,6 +429,7 @@ TickableBlockState {
             return p;
         }
         try {
+            if (this.w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(p.x, p.z)) == null) return p;
             BlockPosition bp = this.w.getBaseBlock(new BlockPosition(p.x, p.y, p.z));
             if (bp != null) {
                 return new Vector3i(bp.x, bp.y, bp.z);
@@ -469,8 +472,10 @@ TickableBlockState {
             if (BENCH_COMPONENT_TYPE == null) {
                 return null;
             }
+            long chunkIdx = ChunkUtil.indexChunkFromBlock(pos.x, pos.z);
+            if (this.w.getChunkIfInMemory(chunkIdx) == null) return null;
             Store<ChunkStore> cs = this.w.getChunkStore().getStore();
-            Ref<ChunkStore> chunkRef = this.w.getChunkStore().getChunkReference(ChunkUtil.indexChunkFromBlock(pos.x, pos.z));
+            Ref<ChunkStore> chunkRef = this.w.getChunkStore().getChunkReference(chunkIdx);
             if (chunkRef == null) {
                 return null;
             }
@@ -616,7 +621,7 @@ TickableBlockState {
             for (ConnectedBlockPatternRule.AdjacentSide side : ConnectedBlockPatternRule.AdjacentSide.values()) {
                 try {
                     boolean hasTarget;
-                    Vector3i rel = side.relativePosition;
+                    Vector3i rel = new Vector3i(side.relativePosition);
                     Vector3i facePos = new Vector3i(this.cachedPosition.x + ((Vector3i)((Object)rel)).x, this.cachedPosition.y + ((Vector3i)((Object)rel)).y, this.cachedPosition.z + ((Vector3i)((Object)rel)).z);
                     Vector3i targetPos = this.correctBenchProbePos(this.resolveNeighborForTransfer(facePos), side, 0);
                     if (targetPos == null) continue;
@@ -875,7 +880,7 @@ TickableBlockState {
                     float pitch = (float)this.facadeRotationX * 1.5707964f;
                     float yaw = (float)this.facadeRotation * 1.5707964f;
                     float roll = (float)this.facadeRotationZ * 1.5707964f;
-                    Vector3f rot = new Vector3f(pitch, yaw, roll);
+                    Rotation3f rot = new Rotation3f(pitch, yaw, roll);
                     TransformComponent tc = (TransformComponent) holder.ensureAndGetComponent(TransformComponent.getComponentType());
                     if (tc != null) {
                         tc.setRotation(rot);
@@ -1202,13 +1207,17 @@ TickableBlockState {
                 try {
                     if (this.hasWirelessTarget() && this.w != null) {
                         Vector3i partner = this.getWirelessTarget();
-                        WirelessHelpers.clearWirelessTarget(this.w, partner);
+                        WirelessHelpers.clearWirelessTargetOnly(this.w, partner);
                     }
                 }
                 catch (Throwable partner) {
                     // empty catch block
                 }
-                WirelessRegistry.unregister(this.cachedPosition);
+                if (this.w != null) {
+                    WirelessRegistry.unregister(this.w, this.cachedPosition);
+                } else {
+                    WirelessRegistry.unregister(this.cachedPosition);
+                }
             }
             catch (Throwable wType) {
                 // empty catch block
@@ -1501,6 +1510,23 @@ TickableBlockState {
                     this.wirelessRegistered = true;
                 }
             }
+            // If already registered but target not set, the partner chunk may have been unloaded
+            // when attemptAutoLink ran. Retry the link whenever the partner chunk becomes available.
+            // Throttled to every 20 ticks to avoid per-tick ECS/chunk lookups.
+            if (this.wirelessRegistered && !this.hasWirelessTarget() && this.w != null && this.tickCounter % 20 == 0) {
+                try {
+                    String _wtRelink = this.data != null && this.data.hopperType != null && !"Normal".equals(this.data.hopperType) ? this.data.hopperType : this.hopperType;
+                    if ("WirelessExport".equalsIgnoreCase(_wtRelink) || "WirelessImport".equalsIgnoreCase(_wtRelink)) {
+                        String wNameRelink = this.data != null && this.data.wirelessName != null && !this.data.wirelessName.isBlank() ? this.data.wirelessName : this.wirelessName;
+                        if (wNameRelink != null && !wNameRelink.isBlank()) {
+                            WirelessRegistry.attemptRelinkIfChunkLoaded(this.w, this.cachedPosition, wNameRelink);
+                        }
+                    }
+                }
+                catch (Throwable ignored) {
+                    // empty catch block
+                }
+            }
             if (ARCIO_PRESENT && "EnableWhenSignal".equals(this.arcioMode) && !this.isArcioActive(this.w)) {
                 return;
             }
@@ -1568,7 +1594,7 @@ TickableBlockState {
                     this.nearbyBuffer.clear();
                 }
                 for (ConnectedBlockPatternRule.AdjacentSide side : this.data.importFaces) {
-                    Vector3i _ri = WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition;
+                    Vector3i _ri = new Vector3i(WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition);
                     Vector3i importFace = new Vector3i(this.cachedPosition.x + ((Vector3i)((Object)_ri)).x, this.cachedPosition.y + ((Vector3i)((Object)_ri)).y, this.cachedPosition.z + ((Vector3i)((Object)_ri)).z);
                     Vector3i importPos = this.resolveNeighborForTransfer(importFace);
                     importPos = this.correctBenchProbePos(importPos, side, this.getRotationIndex());
@@ -1580,36 +1606,11 @@ TickableBlockState {
                     ItemContainer currentIc = this.getItemContainer();
                     ItemStack currentItem = currentIc != null ? currentIc.getItemStack((short)0) : null;
                     if (Ev0Config.isFluidTransferEnabled() && targetFluidId != 0 && currentItem == null && !hasContainer) {
-                        ItemStack bucketStack = null;
-                        switch (targetFluidId) {
-                            case 2: {
-                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Red_Slime", 1, null);
-                                break;
-                            }
-                            case 3: {
-                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Tar", 1, null);
-                                break;
-                            }
-                            case 4: {
-                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Poison", 1, null);
-                                break;
-                            }
-                            case 5: {
-                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Green_Slime", 1, null);
-                                break;
-                            }
-                            case 6: {
-                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Lava", 1, null);
-                                break;
-                            }
-                            case 7: {
-                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Water", 1, null);
-                                break;
-                            }
-                            default: {
-                                bucketStack = null;
-                            }
-                        }
+                        // Resolve the fluid by its persistent string id, not the numeric
+                        // asset-map index which shifts between versions/mod sets.
+                        String fluidKey = EngineCompat.getFluidKey(chunk, importPos.x, importPos.y, importPos.z);
+                        String bucketKey = EngineCompat.filledBucketForFluid(fluidKey);
+                        ItemStack bucketStack = bucketKey == null ? null : new ItemStack(bucketKey, 1, null);
                         if (bucketStack != null) {
                             this.getItemContainer().addItemStackToSlot((short)0, bucketStack);
                             this.pendingFluidRemovals.add(new long[]{importPos.x, importPos.y, importPos.z});
@@ -1766,8 +1767,10 @@ TickableBlockState {
                     Ev0Lib lib;
                     Ref<ChunkStore> blockRef;
                     BlockComponentChunk bcc;
+                    long targetChunkIdx = ChunkUtil.indexChunkFromBlock(target.x, target.z);
+                    if (this.w.getChunkIfInMemory(targetChunkIdx) == null) break block61;
                     Store<ChunkStore> cs = this.w.getChunkStore().getStore();
-                    Ref<ChunkStore> colRef = this.w.getChunkStore().getChunkReference(ChunkUtil.indexChunkFromBlock(target.x, target.z));
+                    Ref<ChunkStore> colRef = this.w.getChunkStore().getChunkReference(targetChunkIdx);
                     if (colRef == null || (bcc = cs.getComponent(colRef, BlockComponentChunk.getComponentType())) == null || (blockRef = bcc.getEntityReference(ChunkUtil.indexBlockInColumn(target.x, target.y, target.z))) == null || (lib = Ev0Lib.getInstance()) == null || lib.getHopperComponentType() == null) break block61;
                     HopperComponent targetComp = cs.getComponent(blockRef, lib.getHopperComponentType());
                     try {
@@ -1855,7 +1858,7 @@ TickableBlockState {
             boolean exportedThisFace = false;
             Vector3i hopperPos = this.getBlockPosition();
             ConnectedBlockPatternRule.AdjacentSide rotated = WorldHelper.rotate(side, this.getRotationIndex());
-            Vector3i rel = rotated.relativePosition;
+            Vector3i rel = new Vector3i(rotated.relativePosition);
             Vector3i exportFace = new Vector3i(hopperPos.x + ((Vector3i)((Object)rel)).x, hopperPos.y + ((Vector3i)((Object)rel)).y, hopperPos.z + ((Vector3i)((Object)rel)).z);
             Vector3i exportPos = this.resolveNeighborForTransfer(exportFace);
             exportPos = this.correctBenchProbePos(exportPos, side, this.getRotationIndex());
@@ -1883,27 +1886,8 @@ TickableBlockState {
                 // empty catch block
             }
             ItemStack currentItem = this.getItemContainer().getItemStack((short)0);
-            if (Ev0Config.isFluidTransferEnabled() && currentItem != null && !hasContainer && targetFluidId != 0 && (itemKey = currentItem.getBlockKey()) != null && itemKey.contains("Bucket") && !itemKey.contains("Empty")) {
-                int fluidToPlace = 0;
-                if (itemKey.contains("Water")) {
-                    fluidToPlace = 7;
-                } else if (itemKey.contains("Lava")) {
-                    fluidToPlace = 6;
-                } else if (itemKey.contains("Green_Slime")) {
-                    fluidToPlace = 5;
-                } else if (itemKey.contains("Poison")) {
-                    fluidToPlace = 4;
-                } else if (itemKey.contains("Tar")) {
-                    fluidToPlace = 3;
-                } else if (itemKey.contains("Red_Slime")) {
-                    fluidToPlace = 2;
-                }
-                if (fluidToPlace != 0) {
-                    this.getItemContainer().removeItemStackFromSlot((short)0, 1);
-                    this.getItemContainer().addItemStackToSlot((short)0, new ItemStack("Container_Bucket", 1, null));
-                    exportedThisFace = true;
-                }
-            }
+            // Filled buckets are kept as-is: the hopper no longer empties a filled bucket
+            // into an adjacent fluid (which left a plain Container_Bucket behind).
             boolean transferred = !exportedThisFace && this.tryTransferToOrFromContainer(state, exportPos, side, entities, true);
             exportedThisFace = exportedThisFace || transferred;
             try {
@@ -1965,6 +1949,7 @@ TickableBlockState {
                             Ref<ChunkStore> blockRef;
                             BlockComponentChunk bcc;
                             if (this.w == null) break block164;
+                            if (this.w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(pos.x, pos.z)) == null) break block164;
                             Store<ChunkStore> cs = this.w.getChunkStore().getStore();
                             Ref<ChunkStore> chunkRef = this.w.getChunkStore().getChunkReference(ChunkUtil.indexChunkFromBlock(pos.x, pos.z));
                             if (chunkRef == null || (bcc = cs.getComponent(chunkRef, BlockComponentChunk.getComponentType())) == null || (blockRef = bcc.getEntityReference(ChunkUtil.indexBlockInColumn(pos.x, pos.y, pos.z))) == null) break block164;
@@ -2221,7 +2206,7 @@ TickableBlockState {
                         }
                     }
                 }
-                if (exportPhase && this.w != null) {
+                if (exportPhase && this.w != null && this.w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(pos.x, pos.z)) != null) {
                     try {
                         Method getIC2;
                         Object cont2;
@@ -2537,9 +2522,11 @@ TickableBlockState {
                     if (this.isSingletonMode() && hopperQty <= 1) {
                         return false;
                     }
+                    int[] hspExport = getHopperInputSlots(state);
                     for (int slot = 0; slot < sourceContainer.getCapacity(); ++slot) {
                         try {
                             int transferAmount3;
+                            if (hspExport != null && !isInputSlot(hspExport, slot)) continue;
                             if (!this.isItemAllowedByFilter(this.resolveItemStackKey(hopperStack))) break;
                             int n = transferAmount3 = this.isSingletonMode() && (float)hopperQty < this.data.tier * (float)Ev0Config.getTierMultiplier() ? hopperQty - 1 : (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)hopperQty);
                             if (transferAmount3 <= 0) break;
@@ -2580,8 +2567,10 @@ TickableBlockState {
                 }
             }
         }
+        int[] hspImport = getHopperInputSlots(state);
         for (int slot = 0; slot < sourceContainer.getCapacity(); ++slot) {
             int transferAmount;
+            if (isInputSlot(hspImport, slot)) continue;
             ItemStack stack = sourceContainer.getItemStack((short)slot);
             if (stack == null) continue;
             String probeKey2 = null;
@@ -2761,7 +2750,7 @@ TickableBlockState {
                         // empty catch block
                     }
                     try {
-                        if (this.w != null) {
+                        if (this.w != null && this.w.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(pos.x, pos.z)) != null) {
                             Store<ChunkStore> cs = this.w.getChunkStore().getStore();
                             Ref<ChunkStore> colRef = this.w.getChunkStore().getChunkReference(ChunkUtil.indexChunkFromBlock(pos.x, pos.z));
                             if (colRef == null) {
@@ -3076,9 +3065,11 @@ TickableBlockState {
                     // empty catch block
                 }
                 int capd = direct.getCapacity();
+                int[] hspDirect = getHopperInputSlots(state);
                 for (int slot = 0; slot < capd; ++slot) {
                     try {
                         int transferAmount;
+                        if (isInputSlot(hspDirect, slot)) continue;
                         stack = direct.getItemStack((short)slot);
                         if (stack == null) continue;
                         blockKey = null;
@@ -3172,7 +3163,7 @@ TickableBlockState {
                     // empty catch block
                 }
                 if (t == null || !t.succeeded()) continue;
-                Vector3i relRot = WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition;
+                Vector3i relRot = new Vector3i(WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition);
                 Vector3d velRot = new Vector3d((double)((Vector3i)((Object)relRot)).x * 0.35, 0.25, (double)((Vector3i)((Object)relRot)).z * 0.35);
                 Vector3i hopperBlock = this.getBlockPosition();
                 Vector3d hopperCenter = new Vector3d((double)hopperBlock.x + 0.5, (double)hopperBlock.y + 0.5, (double)hopperBlock.z + 0.5);
@@ -3343,9 +3334,9 @@ TickableBlockState {
                 entities.removeEntity(ref, RemoveReason.REMOVE);
             } else {
                 TransformComponent tc = (TransformComponent) entities.getComponent(ref, TransformComponent.getComponentType());
-                Vector3d dropPos = tc != null ? tc.getPosition().clone() : new Vector3d((double)importPos.x + 0.5, (double)importPos.y + 0.5, (double)importPos.z + 0.5);
+                Vector3d dropPos = tc != null ? new Vector3d(tc.getPosition()) : new Vector3d((double)importPos.x + 0.5, (double)importPos.y + 0.5, (double)importPos.z + 0.5);
                 entities.removeEntity(ref, RemoveReason.REMOVE);
-                Holder newHolder = ItemComponent.generateItemDrop(entities, (ItemStack)stack.withQuantity(remaining), (Vector3d)dropPos, (Vector3f)Vector3f.ZERO, (float)0.0f, (float)-1.0f, (float)0.0f);
+                Holder newHolder = ItemComponent.generateItemDrop(entities, (ItemStack)stack.withQuantity(remaining), dropPos, Rotation3f.ZERO, (float)0.0f, (float)-1.0f, (float)0.0f);
                 if (newHolder != null) {
                     entities.addEntity(newHolder, AddReason.SPAWN);
                 }
@@ -3440,7 +3431,9 @@ TickableBlockState {
                 int nx = bx + off[0];
                 int ny = by + off[1];
                 int nz = bz + off[2];
-                Ref<ChunkStore> chunkRef = world.getChunkStore().getChunkReference(ChunkUtil.indexChunkFromBlock(nx, nz));
+                long adjChunkIdx = ChunkUtil.indexChunkFromBlock(nx, nz);
+                if (world.getChunkIfInMemory(adjChunkIdx) == null) continue;
+                Ref<ChunkStore> chunkRef = world.getChunkStore().getChunkReference(adjChunkIdx);
                 if (chunkRef == null || (bcc = cs.getComponent(chunkRef, BlockComponentChunk.getComponentType())) == null || (blockRef = bcc.getEntityReference(ChunkUtil.indexBlockInColumn(nx, ny, nz))) == null || (mc = cs.getComponent(blockRef, ArcioMechanismComponent.getComponentType())) == null || mc.getStrongestInputSignal(world) <= 0) continue;
                 return true;
             }
@@ -3895,6 +3888,30 @@ TickableBlockState {
         }
         SIMPLE_DRAWERS_PRESENT = found2;
         DEPENDENCIES = Set.of(new SystemDependency(Order.AFTER, FluidSystems.Ticking.class), new SystemDependency(Order.BEFORE, ChunkBlockTickSystem.Ticking.class));
+    }
+
+    /**
+     * Reflectively calls {@code getHopperProtectedInputSlots()} on {@code state} if the method
+     * exists (i.e. the state implements HopperSlotPolicy). Returns null if unavailable, meaning
+     * no slot restriction applies. Keeps Ev0Lib free of any PhosphorTech dependency.
+     */
+    private static int[] getHopperInputSlots(Object state) {
+        if (state == null) return null;
+        try {
+            java.lang.reflect.Method m = state.getClass().getMethod("getHopperProtectedInputSlots");
+            Object result = m.invoke(state);
+            if (result instanceof int[]) return (int[]) result;
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    /** Returns true if {@code slot} is listed in {@code inputSlots}. */
+    private static boolean isInputSlot(int[] inputSlots, int slot) {
+        if (inputSlots == null) return false;
+        for (int s : inputSlots) {
+            if (s == slot) return true;
+        }
+        return false;
     }
 }
 

@@ -23,6 +23,12 @@ public class Vector3i {
         this.z = v.z;
     }
 
+    public Vector3i(org.joml.Vector3ic v) {
+        this.x = v.x();
+        this.y = v.y();
+        this.z = v.z();
+    }
+
     public boolean equals(Object obj) {
         if (this == obj) {
             return true;

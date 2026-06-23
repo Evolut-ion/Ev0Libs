@@ -29,8 +29,10 @@ public final class WirelessHelpers {
             Ev0Lib lib;
             Ref<ChunkStore> blockRef;
             BlockComponentChunk bcc;
+            long chunkIdx = ChunkUtil.indexChunkFromBlock(pos.x, pos.z);
+            if (world.getChunkIfInMemory(chunkIdx) == null) return null;
             Store<ChunkStore> cs = world.getChunkStore().getStore();
-            Ref<ChunkStore> chunkRef = world.getChunkStore().getChunkReference(ChunkUtil.indexChunkFromBlock(pos.x, pos.z));
+            Ref<ChunkStore> chunkRef = world.getChunkStore().getChunkReference(chunkIdx);
             if (chunkRef != null && (bcc = cs.getComponent(chunkRef, BlockComponentChunk.getComponentType())) != null && (blockRef = bcc.getEntityReference(ChunkUtil.indexBlockInColumn(pos.x, pos.y, pos.z))) != null && (lib = Ev0Lib.getInstance()) != null && (compType = lib.getHopperComponentType()) != null && (comp = cs.getComponent(blockRef, compType)) instanceof HopperComponent) {
                 HopperComponent hc = comp;
                 return hc;
@@ -40,6 +42,18 @@ public final class WirelessHelpers {
             // empty catch block
         }
         return null;
+    }
+
+    public static String[] getSubstitutions(World world, Vector3i pos) {
+        HopperComponent hc = WirelessHelpers.resolveHopperComponent(world, pos);
+        if (hc != null && hc.data != null && hc.data.substitutions != null && hc.data.substitutions.length > 0) {
+            return hc.data.substitutions;
+        }
+        return null;
+    }
+
+    public static String[] getSubstitutions(World world, int x, int y, int z) {
+        return WirelessHelpers.getSubstitutions(world, new Vector3i(x, y, z));
     }
 
     public static String getHopperType(World world, Vector3i pos) {
@@ -295,6 +309,38 @@ public final class WirelessHelpers {
             legacyHc.clearWirelessTarget();
             legacyHc.setWirelessName("");
             return;
+        }
+        catch (Throwable throwable) {
+            // empty catch block
+        }
+    }
+
+    /**
+     * Clears only the wireless target pointer on the hopper at pos, without erasing its channel
+     * name. Used when a linked partner is destroyed so the surviving hopper stays registered under
+     * its channel and can accept a new link.
+     */
+    public static void clearWirelessTargetOnly(World world, Vector3i pos) {
+        HopperComponent hc = WirelessHelpers.resolveHopperComponent(world, pos);
+        if (hc != null) {
+            hc.clearWirelessTarget();
+            return;
+        }
+        try {
+            WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(pos.x, pos.z));
+            if (chunk == null) return;
+            Object state = EngineCompat.getState(chunk, pos.x, pos.y, pos.z);
+            if (state instanceof HopperProcessor) {
+                HopperProcessor hp = (HopperProcessor)state;
+                if (hp.data != null) {
+                    hp.data.wirelessTargetX = Integer.MIN_VALUE;
+                    hp.data.wirelessTargetY = Integer.MIN_VALUE;
+                    hp.data.wirelessTargetZ = Integer.MIN_VALUE;
+                    return;
+                }
+            }
+            if (!(state instanceof HopperComponent)) return;
+            ((HopperComponent)state).clearWirelessTarget();
         }
         catch (Throwable throwable) {
             // empty catch block

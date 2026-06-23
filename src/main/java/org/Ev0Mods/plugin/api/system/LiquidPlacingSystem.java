@@ -19,7 +19,7 @@ import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.math.util.ChunkUtil;
-import com.hypixel.hytale.math.vector.Vector2i;
+import org.joml.Vector2i;
 import com.hypixel.hytale.server.core.asset.type.blocktick.BlockTickStrategy;
 import com.hypixel.hytale.server.core.asset.type.fluid.Fluid;
 import com.hypixel.hytale.server.core.asset.type.fluid.FluidTicker;
@@ -80,7 +80,7 @@ extends EntityTickingSystem<ChunkStore> {
                         boolean isDifferentSection = !ChunkUtil.isSameChunkSection(worldX, y, worldZ, blockX, y, blockZ);
                         FluidSection targetFluidSection = isDifferentSection ? accessor.getFluidSectionByBlock(blockX, y, blockZ) : fluidSection;
                         targetBlockSection = isDifferentSection ? accessor.getBlockSectionByBlock(blockX, y, blockZ) : blockSectionInner;
-                        if (targetBlockSection == null) {
+                        if (targetBlockSection == null || targetFluidSection == null) {
                             return BlockTickStrategy.WAIT_FOR_ADJACENT_CHUNK_LOAD;
                         }
                         int fluidIdTarget = targetFluidSection.getFluidId(blockX, y, blockZ);

@@ -29,8 +29,8 @@ import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.spatial.SpatialResource;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.util.ChunkUtil;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
 import com.hypixel.hytale.math.vector.Vector3i;
 import com.hypixel.hytale.protocol.BlockPosition;
 import com.hypixel.hytale.protocol.Rangef;
@@ -90,8 +90,10 @@ import org.Ev0Mods.plugin.api.codec.ItemHandler;
 import org.Ev0Mods.plugin.api.component.EngineCompat;
 import org.Ev0Mods.plugin.api.component.HopperComponent;
 import org.Ev0Mods.plugin.api.system.WirelessHopperPlaceSystem;
+import org.Ev0Mods.plugin.api.system.WirelessRegistry;
 import org.Ev0Mods.plugin.api.ui.HopperUIPage;
 import org.Ev0Mods.plugin.api.util.ItemUtilsExtended;
+import org.Ev0Mods.plugin.api.util.WirelessHelpers;
 import org.Ev0Mods.plugin.api.util.WorldHelper;
 import org.checkerframework.checker.nullness.compatqual.NonNullDecl;
 import org.joml.Vector3ic;
@@ -294,8 +296,10 @@ ItemContainerBlockState {
             return null;
         }
         try {
+            long chunkIdx = ChunkUtil.indexChunkFromBlock(pos.x, pos.z);
+            if (this.w.getChunkIfInMemory(chunkIdx) == null) return null;
             Store<ChunkStore> cs = this.w.getChunkStore().getStore();
-            Ref<ChunkStore> chunkRef = this.w.getChunkStore().getChunkReference(ChunkUtil.indexChunkFromBlock(pos.x, pos.z));
+            Ref<ChunkStore> chunkRef = this.w.getChunkStore().getChunkReference(chunkIdx);
             if (chunkRef == null) {
                 return null;
             }
@@ -366,7 +370,7 @@ ItemContainerBlockState {
             for (ConnectedBlockPatternRule.AdjacentSide side : ConnectedBlockPatternRule.AdjacentSide.values()) {
                 try {
                     boolean hasTarget;
-                    Vector3i rel = side.relativePosition;
+                    Vector3i rel = new Vector3i(side.relativePosition);
                     Vector3i targetPos = new Vector3i(hopperPos.x + ((Vector3i)((Object)rel)).x, hopperPos.y + ((Vector3i)((Object)rel)).y, hopperPos.z + ((Vector3i)((Object)rel)).z);
                     boolean bl = hasTarget = this.getContainerViaECS(targetPos) != null;
                     if (!hasTarget) {
@@ -747,6 +751,22 @@ ItemContainerBlockState {
             this.es.removeEntity(esx, RemoveReason.REMOVE);
         }
         try {
+            if (this.data != null && this.w != null) {
+                String wType = this.data.hopperType;
+                if ("WirelessExport".equalsIgnoreCase(wType) || "WirelessImport".equalsIgnoreCase(wType)) {
+                    if (this.data.wirelessTargetY != Integer.MIN_VALUE) {
+                        Vector3i partner = new Vector3i(this.data.wirelessTargetX, this.data.wirelessTargetY, this.data.wirelessTargetZ);
+                        WirelessHelpers.clearWirelessTargetOnly(this.w, partner);
+                    }
+                    Vector3i myPos = this.getBlockPosition();
+                    if (myPos != null) {
+                        WirelessRegistry.unregister(this.w, myPos);
+                    }
+                }
+            }
+        }
+        catch (Throwable ignored) {}
+        try {
             Method m = this.getClass().getSuperclass().getMethod("onDestroy", new Class[0]);
             if (m != null) {
                 m.invoke((Object)this, new Object[0]);
@@ -860,36 +880,11 @@ ItemContainerBlockState {
                     boolean hasContainer = state != null && (state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") || state.getClass().getSimpleName().contains("ItemContainer") || this.getItemContainerFromState(state) != null) || state == null && this.getContainerViaECS(importPos) != null;
                     ItemStack currentItem = this.getItemContainer().getItemStack((short)0);
                     if (Ev0Config.isFluidTransferEnabled() && targetFluidId != 0 && currentItem == null && !hasContainer) {
-                        ItemStack bucketStack = null;
-                        switch (targetFluidId) {
-                            case 2: {
-                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Red_Slime", 1, null);
-                                break;
-                            }
-                            case 3: {
-                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Tar", 1, null);
-                                break;
-                            }
-                            case 4: {
-                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Poison", 1, null);
-                                break;
-                            }
-                            case 5: {
-                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Green_Slime", 1, null);
-                                break;
-                            }
-                            case 6: {
-                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Lava", 1, null);
-                                break;
-                            }
-                            case 7: {
-                                bucketStack = new ItemStack("*Container_Bucket_State_Filled_Water", 1, null);
-                                break;
-                            }
-                            default: {
-                                bucketStack = null;
-                            }
-                        }
+                        // Resolve the fluid by its persistent string id, not the numeric
+                        // asset-map index which shifts between versions/mod sets.
+                        String fluidKey = EngineCompat.getFluidKey(chunk, importPos.x, importPos.y, importPos.z);
+                        String bucketKey = EngineCompat.filledBucketForFluid(fluidKey);
+                        ItemStack bucketStack = bucketKey == null ? null : new ItemStack(bucketKey, 1, null);
                         if (bucketStack != null) {
                             this.itemContainer.addItemStackToSlot((short)0, bucketStack);
                             this.pendingFluidRemovals.add(new long[]{importPos.x, importPos.y, importPos.z});
@@ -1240,7 +1235,7 @@ ItemContainerBlockState {
         if (safeStack == null || safeStack.isEmpty()) {
             return;
         }
-        Vector3i rel = WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition;
+        Vector3i rel = new Vector3i(WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition);
         Vector3i hopperBlock = this.getBlockPosition();
         Vector3d hopperCenter = new Vector3d((double)hopperBlock.x + 0.5 + 1.0, (double)hopperBlock.y + 0.5, (double)hopperBlock.z + 0.5);
         Vector3d sourceCenter = new Vector3d((double)pos.x + 0.5 + 1.0, (double)pos.y + 0.5, (double)pos.z + 0.5);
@@ -1277,7 +1272,7 @@ ItemContainerBlockState {
         if (this.nearbyBuffer.isEmpty()) {
             return;
         }
-        Holder itemEntityHolder = ItemComponent.generateItemDrop(entities, (ItemStack)safeStack, (Vector3d)new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z), (Vector3f)Vector3f.ZERO, (float)0.0f, (float)-1.0f, (float)0.0f);
+        Holder itemEntityHolder = ItemComponent.generateItemDrop(entities, (ItemStack)safeStack, (Vector3d)new Vector3d(spawnPos.x, spawnPos.y, spawnPos.z), Rotation3f.ZERO, (float)0.0f, (float)-1.0f, (float)0.0f);
         if (itemEntityHolder == null) {
             return;
         }
@@ -1388,27 +1383,8 @@ ItemContainerBlockState {
             int targetFluidId = EngineCompat.getFluidId(chunk, exportPos.x, exportPos.y, exportPos.z);
             boolean hasContainer = state != null && (state.getClass().getName().equals("com.hypixel.hytale.builtin.crafting.state.ProcessingBenchState") || state.getClass().getSimpleName().contains("ItemContainer") || this.getItemContainerFromState(state) != null) || state == null && this.getContainerViaECS(exportPos) != null;
             ItemStack currentItem = this.getItemContainer().getItemStack((short)0);
-            if (Ev0Config.isFluidTransferEnabled() && currentItem != null && !hasContainer && targetFluidId != 0 && (itemKey = currentItem.getBlockKey()) != null && itemKey.contains("Bucket") && !itemKey.contains("Empty")) {
-                int fluidToPlace = 0;
-                if (itemKey.contains("Water")) {
-                    fluidToPlace = 7;
-                } else if (itemKey.contains("Lava")) {
-                    fluidToPlace = 6;
-                } else if (itemKey.contains("Green_Slime")) {
-                    fluidToPlace = 5;
-                } else if (itemKey.contains("Poison")) {
-                    fluidToPlace = 4;
-                } else if (itemKey.contains("Tar")) {
-                    fluidToPlace = 3;
-                } else if (itemKey.contains("Red_Slime")) {
-                    fluidToPlace = 2;
-                }
-                if (fluidToPlace != 0) {
-                    this.itemContainer.removeItemStackFromSlot((short)0, 1);
-                    this.itemContainer.addItemStackToSlot((short)0, new ItemStack("Container_Bucket", 1, null));
-                    exportedThisFace = true;
-                }
-            }
+            // Filled buckets are kept as-is: the hopper no longer empties a filled bucket
+            // into an adjacent fluid (which left a plain Container_Bucket behind).
             boolean transferred = !exportedThisFace && this.tryTransferToOrFromContainer(state, exportPos, side, entities, true);
             boolean bl = exportedThisFace = exportedThisFace || transferred;
             if (!(exportedThisFace || transferred || currentItem == null || hasContainer || targetFluidId != 0)) {
@@ -1444,8 +1420,7 @@ ItemContainerBlockState {
         if (transferAmount <= 0) {
             return false;
         }
-        Vector3i basePos = this.getBlockPosition();
-        BlockPosition pos = world.getBaseBlock(new BlockPosition(basePos.x, basePos.y, basePos.z));
+        Vector3i pos = this.getBlockPosition();
         for (ConnectedBlockPatternRule.AdjacentSide side : this.data.exportFaces) {
             Vector3i targetPos = new Vector3i(pos.x + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).x, pos.y + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).y, pos.z + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).z);
             WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(targetPos.x, targetPos.z));
@@ -1550,7 +1525,7 @@ ItemContainerBlockState {
                             if (ref != null && ref.isValid()) {
                                 TransformComponent tc = this.es.getComponent(ref, TransformComponent.getComponentType());
                                 if (tc == null) continue;
-                                Vector3d p = tc.getPosition();
+                                Vector3d p = new Vector3d(tc.getPosition());
                                 if (!(Math.abs(p.x - ((double)pos.x + 0.5)) < 0.6) || !(Math.abs(p.y - ((double)pos.y + 0.5)) < 0.6) || !(Math.abs(p.z - ((double)pos.z + 0.5)) < 0.6)) continue;
                                 it.remove();
                                 try {
@@ -1592,8 +1567,7 @@ ItemContainerBlockState {
     }
 
     private boolean handleImport(World world, Store<EntityStore> entities) {
-        Vector3i basePos = this.getBlockPosition();
-        BlockPosition pos = world.getBaseBlock(new BlockPosition(basePos.x, basePos.y, basePos.z));
+        Vector3i pos = this.getBlockPosition();
         for (ConnectedBlockPatternRule.AdjacentSide side : this.data.importFaces) {
             Vector3i targetPos = new Vector3i(pos.x + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).x, pos.y + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).y, pos.z + ((Vector3i)((Object)WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition)).z);
             WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(targetPos.x, targetPos.z));
@@ -1639,7 +1613,7 @@ ItemContainerBlockState {
                 if (this.isSingletonMode() && available <= 1) continue;
                 int n = transferAmount = this.isSingletonMode() && (float)available < this.data.tier * (float)Ev0Config.getTierMultiplier() ? available - 1 : (int)Math.min(this.data.tier * (float)Ev0Config.getTierMultiplier(), (float)available);
                 if (transferAmount <= 0 || !(t = this.getItemContainer().addItemStackToSlot((short)0, stack.withQuantity(transferAmount))).succeeded()) continue;
-                Vector3i relRot = WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition;
+                Vector3i relRot = new Vector3i(WorldHelper.rotate((ConnectedBlockPatternRule.AdjacentSide)side, (int)this.getRotationIndex()).relativePosition);
                 Vector3d velRot = new Vector3d((double)((Vector3i)((Object)relRot)).x * 0.35, 0.25, (double)((Vector3i)((Object)relRot)).z * 0.35);
                 Vector3i hopperBlock = this.getBlockPosition();
                 Vector3d vector3d = new Vector3d((double)hopperBlock.x + 0.5, (double)hopperBlock.y + 0.5, (double)hopperBlock.z + 0.5);
@@ -1927,9 +1901,9 @@ ItemContainerBlockState {
                 entities.removeEntity(ref, RemoveReason.REMOVE);
             } else {
                 TransformComponent tc = entities.getComponent(ref, TransformComponent.getComponentType());
-                Vector3d dropPos = tc != null ? tc.getPosition().clone() : new Vector3d((double)importPos.x + 0.5, (double)importPos.y + 0.5, (double)importPos.z + 0.5);
+                Vector3d dropPos = tc != null ? new Vector3d(tc.getPosition()) : new Vector3d((double)importPos.x + 0.5, (double)importPos.y + 0.5, (double)importPos.z + 0.5);
                 entities.removeEntity(ref, RemoveReason.REMOVE);
-                Holder newHolder = ItemComponent.generateItemDrop(entities, (ItemStack)stack.withQuantity(remaining), (Vector3d)dropPos, (Vector3f)Vector3f.ZERO, (float)0.0f, (float)-1.0f, (float)0.0f);
+                Holder newHolder = ItemComponent.generateItemDrop(entities, (ItemStack)stack.withQuantity(remaining), dropPos, Rotation3f.ZERO, (float)0.0f, (float)-1.0f, (float)0.0f);
                 if (newHolder != null) {
                     entities.addEntity(newHolder, AddReason.SPAWN);
                 }

@@ -40,7 +40,13 @@ public final class HopperUIPage {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private static final ConcurrentHashMap<PlayerRef, String> ACTIVE_TAB = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<PlayerRef, Vector3i> LAST_POS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<PlayerRef, Integer> LINKS_PAGE = new ConcurrentHashMap<>();
     public static final ConcurrentHashMap<PlayerRef, Ref<EntityStore>> PLAYER_ENTITY_REFS = new ConcurrentHashMap<>();
+    // Guards against a single Collect click paying out more than once. Repeated open()
+    // calls stack pages that all bind the same "collectItem" id, so one click can dispatch
+    // to several listeners; this de-dupes them within a short window per (player, pos).
+    private static final ConcurrentHashMap<String, Long> COLLECT_GUARD = new ConcurrentHashMap<>();
+    private static final long COLLECT_GUARD_MS = 400L;
     private static final String[] TAB_ORDER = new String[]{"Status", "Filter", "Facade", "Signals", "Links"};
 
     private HopperUIPage() {
@@ -88,6 +94,7 @@ public final class HopperUIPage {
             Vector3i lastPos = LAST_POS.get(playerRef);
             if (lastPos == null || !lastPos.equals(pos)) {
                 ACTIVE_TAB.remove(playerRef);
+                LINKS_PAGE.remove(playerRef);
                 activeTab = "Status";
             }
             LAST_POS.put(playerRef, pos);
@@ -191,7 +198,13 @@ public final class HopperUIPage {
         int facadeRotationZ = hp != null ? hp.getFacadeRotationZ() : 0;
         ItemContainer _hpIc = hp != null ? hp.getItemContainer() : null;
         boolean hasItem = _hpIc != null && _hpIc.getItemStack((short)0) != null;
-        String html = HopperUIPage.buildHtml(mode, hopperSlot, wlText, blText, heldDisplay, showArcio, arcioMode, activeTab, wirelessName, linkTargetText, linkCandidates, facadeBlockId, facadeConnectionMask, facadeRotation, facadeRotationX, facadeRotationZ, channelOwner, channelPasscode, isChannelOwner, hasItem);
+        final int LINKS_PAGE_SIZE = 5;
+        int linksPageNum = LINKS_PAGE.getOrDefault(playerRef, 0);
+        int totalLinksPages = linkCandidates.isEmpty() ? 1 : (linkCandidates.size() + LINKS_PAGE_SIZE - 1) / LINKS_PAGE_SIZE;
+        linksPageNum = Math.max(0, Math.min(linksPageNum, totalLinksPages - 1));
+        int linksStart = linksPageNum * LINKS_PAGE_SIZE;
+        List<WirelessRegistry.LinkItem> pagedLinkCandidates = new ArrayList<>(linkCandidates.subList(linksStart, Math.min(linksStart + LINKS_PAGE_SIZE, linkCandidates.size())));
+        String html = HopperUIPage.buildHtml(mode, hopperSlot, wlText, blText, heldDisplay, showArcio, arcioMode, activeTab, wirelessName, linkTargetText, pagedLinkCandidates, facadeBlockId, facadeConnectionMask, facadeRotation, facadeRotationX, facadeRotationZ, channelOwner, channelPasscode, isChannelOwner, hasItem, linksPageNum, totalLinksPages);
         PageBuilder builder = ((PageBuilder)PageBuilder.pageForPlayer(playerRef).fromHtml(html)).withLifetime(CustomPageLifetime.CanDismissOrCloseThroughInteraction);
         String currentTab = activeTab;
         boolean isWirelessFinal = isWireless;
@@ -397,9 +410,11 @@ public final class HopperUIPage {
             }
         }
         if ("Links".equals(activeTab)) {
+            final int finalLinksPage = linksPageNum;
+            final int finalTotalLinksPages = totalLinksPages;
             int i = 0;
-            while (i < linkCandidates.size()) {
-                WirelessRegistry.LinkItem candidate = (WirelessRegistry.LinkItem)linkCandidates.get(i);
+            while (i < pagedLinkCandidates.size()) {
+                WirelessRegistry.LinkItem candidate = (WirelessRegistry.LinkItem)pagedLinkCandidates.get(i);
                 int idx = i++;
                 builder.addEventListener("linkWith_" + idx, CustomUIEventBindingType.Activating, (ignored, ctx) -> {
                     Store<EntityStore> s = liveStore(playerRef, store);
@@ -411,7 +426,20 @@ public final class HopperUIPage {
                     }
                     World world = ((EntityStore)s.getExternalData()).getWorld();
                     WirelessRegistry.linkTo(world, pos, candidate.pos);
+                    LINKS_PAGE.remove(playerRef);
                     HopperUIPage.open(playerRef, s, pos, heldItemId);
+                });
+            }
+            if (finalLinksPage > 0) {
+                builder.addEventListener("prevLinksPage", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
+                    LINKS_PAGE.put(playerRef, finalLinksPage - 1);
+                    HopperUIPage.open(playerRef, store, pos, heldItemId);
+                });
+            }
+            if (finalLinksPage < finalTotalLinksPages - 1) {
+                builder.addEventListener("nextLinksPage", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
+                    LINKS_PAGE.put(playerRef, finalLinksPage + 1);
+                    HopperUIPage.open(playerRef, store, pos, heldItemId);
                 });
             }
             if (isChannelOwner && !wirelessName.isBlank()) {
@@ -463,6 +491,13 @@ public final class HopperUIPage {
         }
         if (hasItem) {
             builder.addEventListener("collectItem", CustomUIEventBindingType.Activating, (ignored, ctx) -> {
+                // De-dupe: one Collect click can dispatch to several stacked-page listeners.
+                // Only the first within the guard window is allowed to pay out.
+                String guardKey = String.valueOf(playerRef) + "@" + pos.x + "," + pos.y + "," + pos.z;
+                long nowMs = System.currentTimeMillis();
+                Long lastMs = COLLECT_GUARD.get(guardKey);
+                if (lastMs != null && nowMs - lastMs < COLLECT_GUARD_MS) return;
+                COLLECT_GUARD.put(guardKey, nowMs);
                 Store<EntityStore> s = liveStore(playerRef, store);
                 HopperComponent hopper = HopperUIPage.lookupHopper(s, pos);
                 if (hopper == null) return;
@@ -473,11 +508,26 @@ public final class HopperUIPage {
                 Ref<EntityStore> playerEntityRef = PLAYER_ENTITY_REFS.get(playerRef);
                 if (playerEntityRef == null || !playerEntityRef.isValid()) return;
                 try {
-                    int qty = stack.getQuantity();
-                    if (qty <= 0) return;
-                    ItemStack toGive = java.util.Objects.requireNonNullElse(stack.withQuantity(qty), stack);
-                    ItemUtilsExtended.interactivelyPickupItem(playerEntityRef, toGive, null, s);
-                    ic.removeItemStackFromSlot((short)0, qty);
+                    int beforeQty = stack.getQuantity();
+                    if (beforeQty <= 0) return;
+                    // Clear the hopper slot BEFORE handing items to the player, then give
+                    // ONLY what was actually removed from the slot. If a concurrent/stacked
+                    // listener already emptied it, the delta is 0 and nothing is paid out,
+                    // so a single click can never dupe regardless of how many times it fires.
+                    ic.removeItemStackFromSlot((short)0, beforeQty);
+                    ItemStack afterStack = ic.getItemStack((short)0);
+                    int afterQty = afterStack == null ? 0 : afterStack.getQuantity();
+                    int removed = beforeQty - afterQty;
+                    if (removed <= 0) return;
+                    ItemStack toGive = java.util.Objects.requireNonNullElse(stack.withQuantity(removed), stack);
+                    // When a pickup-XP mod (e.g. MMOSkillTree) is installed, withdraw the
+                    // item silently so it isn't miscredited as a gather/pickup. Otherwise
+                    // use the normal interactive pickup so other listeners still fire.
+                    if (ItemUtilsExtended.PICKUP_XP_MOD_PRESENT) {
+                        ItemUtilsExtended.giveItemSilently(playerEntityRef, toGive, null, s);
+                    } else {
+                        ItemUtilsExtended.interactivelyPickupItem(playerEntityRef, toGive, null, s);
+                    }
                 }
                 catch (Throwable t) {
                     Ev0Log.warn(LOGGER, "collectItem failed: " + t.getMessage());
@@ -511,13 +561,13 @@ public final class HopperUIPage {
         } catch (Throwable t) { }
     }
 
-    private static String buildHtml(String mode, String hopperSlot, String wlText, String blText, String heldItem, boolean showArcio, String arcioMode, String activeTab, String wirelessName, String linkTargetText, List<WirelessRegistry.LinkItem> linkCandidates, String facadeBlockId, int facadeConnectionMask, int facadeRotation, int facadeRotationX, int facadeRotationZ, String channelOwner, String channelPasscode, boolean isChannelOwner, boolean hasItem) {
+    private static String buildHtml(String mode, String hopperSlot, String wlText, String blText, String heldItem, boolean showArcio, String arcioMode, String activeTab, String wirelessName, String linkTargetText, List<WirelessRegistry.LinkItem> linkCandidates, String facadeBlockId, int facadeConnectionMask, int facadeRotation, int facadeRotationX, int facadeRotationZ, String channelOwner, String channelPasscode, boolean isChannelOwner, boolean hasItem, int linksPage, int totalLinksPages) {
         String tabNav = "            <div class=\"tab-nav\">\n                <button id=\"prevTab\" class=\"tab-arrow\">&lt;</button>\n                <p class=\"tab-label\">%s</p>\n                <button id=\"nextTab\" class=\"tab-arrow\">&gt;</button>\n            </div>\n            <div class=\"separator\"></div>\n".formatted(HopperUIPage.escapeHtml(activeTab.toUpperCase()));
         String content = switch (activeTab) {
             case "Filter" -> HopperUIPage.buildFilterTab(wlText, blText, heldItem);
             case "Facade" -> HopperUIPage.buildFacadeTab(facadeBlockId, facadeConnectionMask, facadeRotation, facadeRotationX, facadeRotationZ, EngineCompat.isValidBlockKey(heldItem) ? heldItem : null);
             case "Signals" -> HopperUIPage.buildSignalsTab(showArcio, arcioMode);
-            case "Links" -> HopperUIPage.buildLinksTab(wirelessName, linkTargetText, linkCandidates, channelOwner, channelPasscode, isChannelOwner);
+            case "Links" -> HopperUIPage.buildLinksTab(wirelessName, linkTargetText, linkCandidates, channelOwner, channelPasscode, isChannelOwner, linksPage, totalLinksPages);
             default -> HopperUIPage.buildStatusTab(mode, hopperSlot, hasItem);
         };
         String styles = "<style>\n    .section-title {\n        font-weight: bold;\n        color: #bdcbd3;\n        font-size: 16;\n        padding-top: 12;\n        padding-bottom: 4;\n    }\n    .info-label {\n        padding-top: 4;\n        padding-bottom: 4;\n        color: #a0b8c8;\n        font-size: 14;\n    }\n    .separator {\n        layout-mode: Full;\n        anchor-height: 2;\n        background-color: #ffffff(0.15);\n        margin-top: 8;\n        margin-bottom: 8;\n    }\n    .btn-row {\n        layout-mode: Left;\n        padding-top: 6;\n        padding-bottom: 6;\n        spacing: 8;\n    }\n    .input-field {\n        padding-top: 8;\n        padding-bottom: 8;\n    }\n    .tab-nav {\n        layout-mode: Center;\n        padding-top: 6;\n        padding-bottom: 2;\n        spacing: 16;\n    }\n    .tab-label {\n        font-weight: bold;\n        font-size: 18;\n        color: #ffffff;\n        min-width: 120;\n        text-align: center;\n    }\n    .tab-arrow {\n        anchor-width: 36;\n        anchor-height: 36;\n        font-size: 18;\n        padding: 4 10;\n    }\n</style>\n";
@@ -537,7 +587,7 @@ public final class HopperUIPage {
         return "            <p class=\"section-title\">Filter Lists</p>\n            <p id=\"wlLabel\" class=\"info-label\">Whitelist: %s</p>\n            <p id=\"blLabel\" class=\"info-label\">Blacklist: %s</p>\n            %s\n            <div class=\"separator\"></div>\n            <p class=\"section-title\">Item Entry</p>\n            <div class=\"input-field\">\n                <input type=\"text\" id=\"itemInput\" value=\"\" placeholder=\"Item ID (e.g. Wood_Ash_Trunk)\" style=\"width: 100%%; padding: 8 12; font-size: 14;\" />\n            </div>\n            <div class=\"btn-row\">\n                <button id=\"addWl\" class=\"secondary-button\" style=\"padding: 6 16;\">+ Whitelist</button>\n                <button id=\"addBl\" class=\"secondary-button\" style=\"padding: 6 16;\">+ Blacklist</button>\n            </div>\n            <div class=\"btn-row\">\n                <button id=\"removeWl\" class=\"tertiary-button\" style=\"padding: 4 12;\">- Remove Last</button>\n                <button id=\"removeBl\" class=\"tertiary-button\" style=\"padding: 4 12;\">- Remove Last</button>\n            </div>\n            <div class=\"btn-row\">\n                <button id=\"clearWl\" class=\"tertiary-button\" style=\"padding: 4 12;\">Clear Whitelist</button>\n                <button id=\"clearBl\" class=\"tertiary-button\" style=\"padding: 4 12;\">Clear Blacklist</button>\n            </div>\n            <div class=\"separator\"></div>\n            <p class=\"section-title\">Filter Mode</p>\n            <div class=\"btn-row\">\n                <button id=\"modeOff\" class=\"primary-button\" style=\"padding: 8 20;\">Off</button>\n                <button id=\"modeWl\" class=\"primary-button\" style=\"padding: 8 20;\">Whitelist</button>\n                <button id=\"modeBl\" class=\"primary-button\" style=\"padding: 8 20;\">Blacklist</button>\n                <button id=\"modeSingleton\" class=\"primary-button\" style=\"padding: 8 20;\">Singleton</button>\n            </div>\n".formatted(HopperUIPage.escapeHtml(wlText), HopperUIPage.escapeHtml(blText), heldSection);
     }
 
-    private static String buildLinksTab(String wirelessName, String linkTargetText, List<WirelessRegistry.LinkItem> candidates, String channelOwner, String channelPasscode, boolean isChannelOwner) {
+    private static String buildLinksTab(String wirelessName, String linkTargetText, List<WirelessRegistry.LinkItem> candidates, String channelOwner, String channelPasscode, boolean isChannelOwner, int currentPage, int totalPages) {
         if (wirelessName == null) wirelessName = "";
         if (linkTargetText == null) linkTargetText = "(none)";
         StringBuilder sb = new StringBuilder();
@@ -590,6 +640,17 @@ public final class HopperUIPage {
                 sb.append("                                <button id=\"linkWith_").append(i).append("\" class=\"primary-button\" style=\"padding: 6 16;\">Link</button>\n");
                 sb.append("                            </div>\n");
             }
+        }
+        if (totalPages > 1) {
+            sb.append("                            <div class=\"btn-row\">\n");
+            if (currentPage > 0) {
+                sb.append("                                <button id=\"prevLinksPage\" class=\"secondary-button\" style=\"padding: 6 14;\">&lt; Prev</button>\n");
+            }
+            sb.append("                                <p class=\"info-label\" style=\"flex-grow: 1; text-align: center;\">Page ").append(currentPage + 1).append(" / ").append(totalPages).append("</p>\n");
+            if (currentPage < totalPages - 1) {
+                sb.append("                                <button id=\"nextLinksPage\" class=\"secondary-button\" style=\"padding: 6 14;\">Next &gt;</button>\n");
+            }
+            sb.append("                            </div>\n");
         }
         sb.append("            <div class=\"separator\"></div>\n            <div class=\"btn-row\">\n                <button id=\"linkUnlink\" class=\"tertiary-button\" style=\"padding: 8 20;\">Unlink</button>\n            </div>\n");
         return sb.toString();
@@ -706,9 +767,6 @@ public final class HopperUIPage {
                 // empty catch block
             }
             Object state = EngineCompat.getState(chunk, pos.x, pos.y, pos.z);
-            if (state == null) {
-                state = EngineCompat.getState(chunk, pos.x, pos.y, pos.z);
-            }
             if (state instanceof HopperProcessor hp) {
                 HopperComponent hc = new HopperComponent();
                 try {

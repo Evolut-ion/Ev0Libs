@@ -11,8 +11,8 @@ import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import org.joml.Vector3d;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.Rotation;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
@@ -52,14 +52,14 @@ public class WorldHelper {
     public static void dropItems(World world, List<ItemStack> drops, Vector3d position) {
         Store<EntityStore> store = world.getEntityStore().getStore();
         if (store != null && !drops.isEmpty()) {
-            Holder[] dropHolder = ItemComponent.generateItemDrops(store, drops, (Vector3d)position.clone(), (Vector3f)Vector3f.ZERO.clone());
+            Holder[] dropHolder = ItemComponent.generateItemDrops(store, drops, new Vector3d(position), Rotation3f.ZERO);
             store.addEntities(dropHolder, AddReason.SPAWN);
         }
     }
 
     public static void dropItems(List<ItemStack> drops, Vector3d position, @Nonnull Store<EntityStore> store, @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         if (!drops.isEmpty()) {
-            Holder[] dropHolder = ItemComponent.generateItemDrops(store, drops, (Vector3d)position.clone(), (Vector3f)Vector3f.ZERO.clone());
+            Holder[] dropHolder = ItemComponent.generateItemDrops(store, drops, new Vector3d(position), Rotation3f.ZERO);
             commandBuffer.addEntities(dropHolder, AddReason.SPAWN);
         }
     }

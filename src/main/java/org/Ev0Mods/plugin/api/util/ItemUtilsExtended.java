@@ -13,8 +13,8 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.math.vector.Transform;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.entity.EntityUtils;
 import com.hypixel.hytale.server.core.entity.LivingEntity;
@@ -43,6 +43,22 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public class ItemUtilsExtended {
+    // Detect skill/progression mods that attribute XP by listening for
+    // InteractivelyPickupItemEvent. When present, container withdrawals (e.g. the
+    // hopper Collect button) must NOT fire that event, otherwise the withdrawal is
+    // miscredited as a gather/pickup. Currently: MMOSkillTree.
+    public static final boolean PICKUP_XP_MOD_PRESENT;
+
+    static {
+        boolean found = false;
+        try {
+            Class.forName("com.ziggfreed.mmoskilltree.event.PickupItemEventSystem");
+            found = true;
+        }
+        catch (Throwable ignored) {}
+        PICKUP_XP_MOD_PRESENT = found;
+    }
+
     private static double centerCoord(double c) {
         double frac = c - Math.floor(c);
         if (Math.abs(frac - 0.5) < 0.01) {
@@ -73,7 +89,7 @@ public class ItemUtilsExtended {
                 }
                 Holder pickupItemHolder = null;
                 Item item = itemStack.getItem();
-                ItemContainer itemContainer = playerComponent.getInventory().getContainerForItemPickup(item, playerSettingsComponent);
+                ItemContainer itemContainer = playerComponent.getInventory().getCombinedHotbarFirst();
                 ItemStackTransaction transaction = itemContainer.addItemStack(itemStack);
                 ItemStack remainder = transaction.getRemainder();
                 if (remainder != null && !remainder.isEmpty()) {
@@ -101,6 +117,46 @@ public class ItemUtilsExtended {
         }
     }
 
+    /**
+     * Adds an item directly to the player's inventory WITHOUT firing
+     * {@link InteractivelyPickupItemEvent}. Use for container withdrawals (e.g. the
+     * hopper Collect button) so progression mods like MMOSkillTree don't miscredit
+     * the withdrawal as a gather/pickup. Mirrors the non-event behaviour of
+     * {@link #interactivelyPickupItem}: overflow is dropped and the player still gets
+     * the normal pickup notification.
+     */
+    public static void giveItemSilently(@Nonnull Ref<EntityStore> ref, @Nonnull ItemStack itemStack, @Nullable Vector3d origin, @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+        LivingEntity entity = (LivingEntity)EntityUtils.getEntity(ref, componentAccessor);
+        Player playerComponent = componentAccessor.getComponent(ref, Player.getComponentType());
+        if (playerComponent != null) {
+            Holder pickupItemHolder = null;
+            ItemContainer itemContainer = playerComponent.getInventory().getCombinedHotbarFirst();
+            ItemStackTransaction transaction = itemContainer.addItemStack(itemStack);
+            ItemStack remainder = transaction.getRemainder();
+            if (remainder != null && !remainder.isEmpty()) {
+                int quantity = itemStack.getQuantity() - remainder.getQuantity();
+                if (quantity > 0) {
+                    ItemStack itemStackClone = itemStack.withQuantity(quantity);
+                    playerComponent.notifyPickupItem(ref, itemStackClone, null, componentAccessor);
+                    if (origin != null) {
+                        pickupItemHolder = ItemComponent.generatePickedUpItem((ItemStack)itemStackClone, (Vector3d)origin, componentAccessor, ref);
+                    }
+                }
+                ItemUtilsExtended.dropItem(ref, remainder, componentAccessor);
+            } else {
+                playerComponent.notifyPickupItem(ref, itemStack, null, componentAccessor);
+                if (origin != null) {
+                    pickupItemHolder = ItemComponent.generatePickedUpItem((ItemStack)itemStack, (Vector3d)origin, componentAccessor, ref);
+                }
+            }
+            if (pickupItemHolder != null) {
+                componentAccessor.addEntity(pickupItemHolder, AddReason.SPAWN);
+            }
+        } else {
+            SimpleItemContainer.addOrDropItemStack(componentAccessor, ref, entity.getInventory().getCombinedHotbarFirst(), itemStack);
+        }
+    }
+
     @Nullable
     public static Ref<EntityStore> throwItem(@Nonnull Ref<EntityStore> ref, @Nonnull ItemStack itemStack, float throwSpeed, @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         DropItemEvent.Drop event = new DropItemEvent.Drop(itemStack, throwSpeed);
@@ -113,8 +169,8 @@ public class ItemUtilsExtended {
         if (!itemStack.isEmpty() && itemStack.isValid()) {
             HeadRotation headRotationComponent = componentAccessor.getComponent(ref, HeadRotation.getComponentType());
             assert (headRotationComponent != null);
-            Vector3f rotation = headRotationComponent.getRotation();
-            Vector3d direction = Transform.getDirection((float)rotation.getPitch(), (float)rotation.getYaw());
+            Rotation3f rotation = headRotationComponent.getRotation();
+            Vector3d direction = new Vector3d(Transform.getDirection(rotation.pitch(), rotation.yaw()));
             return ItemUtilsExtended.throwItem(ref, componentAccessor, itemStack, direction, throwSpeed);
         }
         return null;
@@ -124,8 +180,8 @@ public class ItemUtilsExtended {
     public static Ref<EntityStore> throwItem(@Nonnull Ref<EntityStore> ref, @Nonnull ComponentAccessor<EntityStore> store, @Nonnull ItemStack itemStack, @Nonnull Vector3d throwDirection, float throwSpeed) {
         TransformComponent transformComponent = store.getComponent(ref, TransformComponent.getComponentType());
         assert (transformComponent != null);
-        Vector3d throwPosition = transformComponent.getPosition().clone();
-        Holder itemEntityHolder = ItemComponent.generateItemDrop(store, (ItemStack)itemStack, (Vector3d)throwPosition, (Vector3f)Vector3f.ZERO, (float)0.0f, (float)-0.1f, (float)0.0f);
+        Vector3d throwPosition = new Vector3d(transformComponent.getPosition());
+        Holder itemEntityHolder = ItemComponent.generateItemDrop(store, (ItemStack)itemStack, throwPosition, Rotation3f.ZERO, 0.0f, -0.1f, 0.0f);
         if (itemEntityHolder == null) {
             return null;
         }
@@ -168,8 +224,8 @@ public class ItemUtilsExtended {
     public static Ref<EntityStore> throwItem(Vector3d pos, @Nonnull Ref<EntityStore> ref, @Nonnull ComponentAccessor<EntityStore> store, @Nonnull ItemStack itemStack, @Nonnull Vector3d throwDirection, float throwSpeed) {
         TransformComponent transformComponent = store.getComponent(ref, TransformComponent.getComponentType());
         assert (transformComponent != null);
-        Vector3d throwPosition = transformComponent.getPosition().clone();
-        Holder itemEntityHolder = ItemComponent.generateItemDrop(store, (ItemStack)itemStack, (Vector3d)new Vector3d(pos.x + 0.5, pos.y + 1.5, pos.z + 0.5), (Vector3f)Vector3f.ZERO, (float)0.0f, (float)-1.0f, (float)0.0f);
+        Vector3d throwPosition = new Vector3d(transformComponent.getPosition());
+        Holder itemEntityHolder = ItemComponent.generateItemDrop(store, (ItemStack)itemStack, (Vector3d)new Vector3d(pos.x + 0.5, pos.y + 1.5, pos.z + 0.5), Rotation3f.ZERO, (float)0.0f, (float)-1.0f, (float)0.0f);
         if (itemEntityHolder == null) {
             return null;
         }
@@ -211,7 +267,7 @@ public class ItemUtilsExtended {
         TransformComponent transformComponent = store.getComponent(ref, TransformComponent.getComponentType());
         assert (transformComponent != null);
         Vector3d spawnPos = new Vector3d(pos.x, pos.y + 0.5, pos.z + 0.5);
-        Holder itemEntityHolder = ItemComponent.generateItemDrop(store, (ItemStack)itemStack, (Vector3d)spawnPos, (Vector3f)Vector3f.ZERO, (float)0.0f, (float)0.0f, (float)0.0f);
+        Holder itemEntityHolder = ItemComponent.generateItemDrop(store, (ItemStack)itemStack, (Vector3d)spawnPos, Rotation3f.ZERO, (float)0.0f, (float)0.0f, (float)0.0f);
         if (itemEntityHolder == null) {
             return null;
         }
@@ -265,7 +321,7 @@ public class ItemUtilsExtended {
 
     public static Ref<EntityStore> throwItem(String blockId, String side, Vector3d pos, @Nonnull Ref<EntityStore> ref, @Nonnull ComponentAccessor<EntityStore> store, @Nonnull ItemStack itemStack, @Nonnull Vector3d throwDirection, float throwSpeed) {
         Vector3d spawnPos = new Vector3d(pos.x + 0.5, pos.y + 0.2, pos.z + 0.5);
-        Holder itemEntityHolder = ItemComponent.generateItemDrop(store, (ItemStack)itemStack, (Vector3d)spawnPos, (Vector3f)Vector3f.ZERO, (float)0.0f, (float)0.0f, (float)0.0f);
+        Holder itemEntityHolder = ItemComponent.generateItemDrop(store, (ItemStack)itemStack, (Vector3d)spawnPos, Rotation3f.ZERO, (float)0.0f, (float)0.0f, (float)0.0f);
         if (itemEntityHolder == null) {
             return null;
         }
@@ -318,10 +374,10 @@ public class ItemUtilsExtended {
     public static Ref<EntityStore> throwItem(@Nonnull Ref<EntityStore> ref, @Nonnull ComponentAccessor<EntityStore> store, @Nonnull ItemStack itemStack, @Nonnull Vector3d throwDirection, float throwSpeed, Vector3d pos) {
         TransformComponent transformComponent = store.getComponent(ref, TransformComponent.getComponentType());
         assert (transformComponent != null);
-        Vector3d throwPosition = transformComponent.getPosition().clone();
+        Vector3d throwPosition = new Vector3d(transformComponent.getPosition());
         throwPosition.add(0.0, 0.0, 0.5);
         transformComponent.setPosition(new Vector3d(pos.x, pos.y - 0.5, pos.z));
-        Holder itemEntityHolder = ItemComponent.generateItemDrop(store, (ItemStack)itemStack, (Vector3d)pos, (Vector3f)Vector3f.ZERO, (float)0.0f, (float)(-0.1f * throwSpeed), (float)0.0f);
+        Holder itemEntityHolder = ItemComponent.generateItemDrop(store, (ItemStack)itemStack, (Vector3d)pos, Rotation3f.ZERO, (float)0.0f, (float)(-0.1f * throwSpeed), (float)0.0f);
         if (itemEntityHolder == null) {
             return null;
         }
@@ -338,7 +394,7 @@ public class ItemUtilsExtended {
             catch (Exception exception) {
                 // empty catch block
             }
-            TransformComponent transformComponent2 = new TransformComponent(pos, Vector3f.ZERO);
+            TransformComponent transformComponent2 = new TransformComponent(pos, Rotation3f.ZERO);
         }
         return store.addEntity(itemEntityHolder, AddReason.SPAWN);
     }

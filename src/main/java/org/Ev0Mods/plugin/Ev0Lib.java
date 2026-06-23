@@ -68,6 +68,12 @@ extends JavaPlugin {
         }
         getChunkStoreRegistry().registerSystem(new LiquidPlacingSystem());
         this.FluidComponent = getEntityStoreRegistry().registerComponent(FluidComponent.class, FluidComponent::new);
+        // Interaction codecs MUST be (re-)registered during setup() so they are present
+        // when the asset pack (e.g. OmniHopper) is validated; the constructor registration
+        // alone is not honored at validation time and causes the mod to fail to load.
+        // Registering the same id twice is an idempotent map overwrite, so this does NOT
+        // double-bind the interaction — the hopper-UI duplication is prevented in the
+        // Collect handler instead (remove-before-give).
         try {
             getCodecRegistry(Interaction.CODEC).register("WrenchInteraction", WrenchInteraction.class, WrenchInteraction.CODEC);
         }

@@ -9,7 +9,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.util.ChunkUtil;
-import com.hypixel.hytale.math.vector.Vector3i;
+import org.joml.Vector3i;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.entity.InteractionContext;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -88,7 +88,7 @@ extends SimpleBlockInteraction {
                         catch (Throwable throwable) {
                             // empty catch block
                         }
-                        HopperUIPage.open(pref, store, vector3i, heldItemId);
+                        HopperUIPage.open(pref, store, new com.hypixel.hytale.math.vector.Vector3i(vector3i), heldItemId);
                         Ev0Log.info(HytaleLogger.forEnclosingClass(), "HopperInteraction: requested HopperUIPage.open for player=" + String.valueOf(pref) + " pos=" + String.valueOf(vector3i) + " held=" + heldItemId);
                         Ev0Log.warn(HytaleLogger.forEnclosingClass(), "[Ev0Lib][DIAG] HopperInteraction requested UI open for player=" + String.valueOf(pref) + " pos=" + String.valueOf(vector3i) + " held=" + heldItemId);
                     }
