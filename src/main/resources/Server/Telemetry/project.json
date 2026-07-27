@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "projectId": "Ev0Lib",
+  "displayName": "Ev0Lib",
+  "ownerPluginIdentifiers": ["Ev0sMods:Ev0Lib"],
+  "packagePrefixes": ["org.Ev0Mods.plugin"],
+  "hosted": {
+    "projectKey": "proj_RkDMMFfgKUIKIN13grLK8lvf"
+  },
+  "telemetry": {
+    "crash": {
+      "supported": true,
+      "defaultEnabled": true,
+      "uncaughtExceptions": true,
+      "setupFailures": true,
+      "startFailures": true,
+      "exceptionalWorldRemovals": true
+    },
+    "events": {
+      "errors": { "supported": true, "defaultEnabled": true },
+      "lifecycle": { "supported": true, "defaultEnabled": true },
+      "breadcrumbs": { "supported": true, "defaultEnabled": true, "automatic": true }
+    },
+    "performance": {
+      "supported": true,
+      "defaultEnabled": true,
+      "sampleRate": 1.0,
+      "thresholdMs": 100
+    },
+    "usage": {
+      "supported": true,
+      "defaultEnabled": true
+    },
+    "stats": {
+      "supported": true,
+      "defaultEnabled": true
+    },
+    "reports": {
+      "supported": true,
+      "defaultEnabled": true,
+      "issue": { "enabled": true },
+      "suggestion": { "enabled": true }
+    }
+  }
+}

@@ -3,24 +3,20 @@
  */
 package org.Ev0Mods.plugin;
 
-import com.hypixel.hytale.codec.builder.BuilderCodec;
-import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
-import com.hypixel.hytale.component.ComponentRegistryProxy;
-import com.hypixel.hytale.component.ComponentType;
-import com.hypixel.hytale.logger.HytaleLogger;
-import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
-import com.hypixel.hytale.server.core.plugin.JavaPlugin;
-import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
-import com.hypixel.hytale.server.core.plugin.registry.CodecMapRegistry;
-import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.lang.reflect.Method;
 import java.util.function.Supplier;
+
 import javax.annotation.Nonnull;
+
 import org.Ev0Mods.plugin.api.Ev0Config;
 import org.Ev0Mods.plugin.api.Ev0Log;
 import org.Ev0Mods.plugin.api.codec.IdOutput;
 import org.Ev0Mods.plugin.api.codec.ItemHandler;
+import org.Ev0Mods.plugin.api.command.DemoCommand;
+import org.Ev0Mods.plugin.api.command.ReportCommand;
+import org.Ev0Mods.plugin.api.command.SuggestCommand;
+import org.Ev0Mods.plugin.api.command.TelemetryOptCommand;
+import org.Ev0Mods.plugin.api.command.ThrowCommand;
 import org.Ev0Mods.plugin.api.component.FluidComponent;
 import org.Ev0Mods.plugin.api.component.HopperComponent;
 import org.Ev0Mods.plugin.api.interactions.HopperInteraction;
@@ -28,6 +24,23 @@ import org.Ev0Mods.plugin.api.interactions.WrenchInteraction;
 import org.Ev0Mods.plugin.api.system.HopperComponentSystem;
 import org.Ev0Mods.plugin.api.system.LiquidPlacingSystem;
 import org.Ev0Mods.plugin.api.system.WirelessHopperPlaceSystem;
+import org.Ev0Mods.plugin.api.system.WirelessRegistry;
+import org.Ev0Mods.plugin.api.telemetry.Ev0Telemetry;
+import org.Ev0Mods.plugin.api.ui.HopperUIPage;
+import org.Ev0Mods.plugin.api.ui.TemplateDemoPage;
+
+import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
+import com.hypixel.hytale.component.ComponentRegistryProxy;
+import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
+import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
+import com.hypixel.hytale.server.core.plugin.JavaPlugin;
+import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
+import com.hypixel.hytale.server.core.plugin.registry.CodecMapRegistry;
+import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 public class Ev0Lib
 extends JavaPlugin {
@@ -55,10 +68,75 @@ extends JavaPlugin {
     }
 
     @Override
+    protected void shutdown() {
+        try { Ev0Telemetry.shutdown(); } catch (Throwable ignored) {}
+    }
+
+    @Override
     protected void setup() {
         Ev0Log.info(LOGGER, "Setting up plugin " + this.getName());
         String configDir = this.getDataDirectory().toAbsolutePath().toString();
         Ev0Config.initialize(configDir);
+        try {
+            WirelessRegistry.initialize(this.getDataDirectory().toAbsolutePath());
+        } catch (Throwable t) {
+            Ev0Log.warn(LOGGER, "Failed to initialize WirelessRegistry: " + t.getMessage());
+        }
+        this.getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, event -> {
+            try { HopperUIPage.cleanupStaleRefs(); } catch (Throwable ignored) {}
+            try { TemplateDemoPage.cleanup(event.getPlayerRef()); } catch (Throwable ignored) {}
+            try { Ev0Telemetry.notifyPlayerLeft(); } catch (Throwable ignored) {}
+        });
+        try {
+            this.getEventRegistry().registerGlobal(PlayerReadyEvent.class,
+                    event -> Ev0Telemetry.notifyPlayerJoined());
+        } catch (Throwable t) {
+            Ev0Log.warn(LOGGER, "Could not register PlayerReadyEvent: " + t.getMessage());
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            Class<Object> spEvent = (Class<Object>) Class.forName(
+                    "com.hypixel.hytale.server.core.modules.singleplayer.SingleplayerRequestAccessEvent");
+            this.getEventRegistry().registerGlobal(spEvent,
+                    event -> Ev0Telemetry.setServerType("singleplayer"));
+        } catch (Throwable t) {
+            // Not singleplayer or event unavailable — default "server" type is correct
+        }
+        try {
+            Ev0Telemetry.initialize(this.getManifest().getVersion().toString());
+        } catch (Throwable t) {
+            Ev0Log.warn(LOGGER, "Failed to initialize Ev0Telemetry: " + t.getMessage());
+        }
+        try {
+            getCommandRegistry().registerCommand(new ReportCommand());
+            Ev0Log.info(LOGGER, "Registered /report command");
+        } catch (Throwable t) {
+            Ev0Log.warn(LOGGER, "Failed to register /report command: " + t.getMessage());
+        }
+        try {
+            getCommandRegistry().registerCommand(new SuggestCommand());
+            Ev0Log.info(LOGGER, "Registered /suggest command");
+        } catch (Throwable t) {
+            Ev0Log.warn(LOGGER, "Failed to register /suggest command: " + t.getMessage());
+        }
+        try {
+            getCommandRegistry().registerCommand(new DemoCommand());
+            Ev0Log.info(LOGGER, "Registered /demo command");
+        } catch (Throwable t) {
+            Ev0Log.warn(LOGGER, "Failed to register /demo command: " + t.getMessage());
+        }
+        try {
+            getCommandRegistry().registerCommand(new ThrowCommand());
+            Ev0Log.info(LOGGER, "Registered /throw command");
+        } catch (Throwable t) {
+            Ev0Log.warn(LOGGER, "Failed to register /throw command: " + t.getMessage());
+        }
+        try {
+            getCommandRegistry().registerCommand(new TelemetryOptCommand());
+            Ev0Log.info(LOGGER, "Registered /telemetry command");
+        } catch (Throwable t) {
+            Ev0Log.warn(LOGGER, "Failed to register /telemetry command: " + t.getMessage());
+        }
         Ev0Log.info(LOGGER, "Config initialized with tierMultiplier=" + Ev0Config.getTierMultiplier() + ", fluidTransferEnabled=" + Ev0Config.isFluidTransferEnabled());
         CodecMapRegistry itemOutputCodec = getCodecRegistry((StringCodecMapCodec) ItemHandler.CODEC);
         try {
@@ -72,7 +150,7 @@ extends JavaPlugin {
         // when the asset pack (e.g. OmniHopper) is validated; the constructor registration
         // alone is not honored at validation time and causes the mod to fail to load.
         // Registering the same id twice is an idempotent map overwrite, so this does NOT
-        // double-bind the interaction — the hopper-UI duplication is prevented in the
+        // double-bind the interaction -- the hopper-UI duplication is prevented in the
         // Collect handler instead (remove-before-give).
         try {
             getCodecRegistry(Interaction.CODEC).register("WrenchInteraction", WrenchInteraction.class, WrenchInteraction.CODEC);
@@ -158,4 +236,3 @@ extends JavaPlugin {
         this.FluidComponent = liquidComponent;
     }
 }
-

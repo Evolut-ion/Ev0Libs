@@ -1,0 +1,61 @@
+<style>
+    .title {
+        font-weight: bold;
+        color: #ffffff;
+        font-size: 20;
+        padding-top: 8;
+        padding-bottom: 8;
+    }
+    .section {
+        padding-top: 4;
+        padding-bottom: 4;
+        color: #bdcbd3;
+        font-size: 16;
+    }
+    .info-label {
+        padding-top: 6;
+        padding-bottom: 6;
+        color: #a0b8c8;
+        font-size: 14;
+    }
+    .btn-row {
+        layout-mode: Left;
+        padding-top: 6;
+        padding-bottom: 6;
+        spacing: 8;
+    }
+    .separator {
+        layout-mode: Full;
+        anchor-height: 2;
+        background-color: #ffffff(0.15);
+        margin-top: 8;
+        margin-bottom: 8;
+    }
+    .counter-value {
+        font-weight: bold;
+        font-size: 28;
+        color: #ffffff;
+        text-align: center;
+        padding-top: 12;
+        padding-bottom: 12;
+    }
+</style>
+<div class="page-overlay">
+    <div class="decorated-container" data-hyui-title="Template Demo" style="anchor-width: 400; anchor-height: 340;">
+        <div class="container-contents" style="layout-mode: Top; padding: 16 24;">
+            <p class="title">{{title}}</p>
+            <p class="info-label">{{description}}</p>
+            <div class="separator"></div>
+            <p class="section">Counter</p>
+            <p id="counterLabel" class="counter-value">{{counter}}</p>
+            <div class="btn-row">
+                <button id="incrementBtn" class="primary-button" style="padding: 8 20;">+ Increment</button>
+                <button id="decrementBtn" class="primary-button" style="padding: 8 20;">- Decrement</button>
+            </div>
+            <div class="separator"></div>
+            <div class="btn-row">
+                <button id="closeBtn" class="tertiary-button" style="padding: 6 16;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>

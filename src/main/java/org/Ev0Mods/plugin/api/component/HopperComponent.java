@@ -155,6 +155,9 @@ TickableBlockState {
     private static final ConcurrentHashMap<HopperComponent, Boolean> REGISTERED_COMPONENTS = new ConcurrentHashMap();
     private transient ItemContainerBlockState itemContainerBlock;
     private transient ItemContainer itemContainer;
+    // Persisted item data for chunk unload/reload survival (CODEC serialized)
+    private String savedItemKey;
+    private int savedItemQuantity;
     private Vector3i cachedPosition = new Vector3i(0, 0, 0);
     public static final BuilderCodec<HopperComponent> CODEC;
     private static volatile List<Object> KNOWN_CONTAINER_COMP_TYPES;
@@ -1093,6 +1096,8 @@ TickableBlockState {
         this.whitelist.addAll(other.whitelist);
         this.blacklist.addAll(other.blacklist);
         this.filterMode = other.filterMode;
+        this.savedItemKey = other.savedItemKey;
+        this.savedItemQuantity = other.savedItemQuantity;
         this.typedBuffer.putAll(other.typedBuffer);
         this.hopperType = other.hopperType;
         this.wirelessName = other.wirelessName;
@@ -1414,6 +1419,8 @@ TickableBlockState {
                                 Object cont = getIC.invoke((Object)this.itemContainerBlock, new Object[0]);
                                 if (cont instanceof ItemContainer) {
                                     this.itemContainer = (ItemContainer)cont;
+                                    this.savedItemKey = null;
+                                    this.savedItemQuantity = 0;
                                 }
                             }
                             catch (Throwable ignored) {
@@ -1451,6 +1458,8 @@ TickableBlockState {
                         Object contObj = this.getItemContainerFromState(state);
                         if (contObj instanceof ItemContainer) {
                             this.itemContainer = (ItemContainer)contObj;
+                            this.savedItemKey = null;
+                            this.savedItemQuantity = 0;
                             break block127;
                         }
                         this.itemContainer = this.getContainerFromItemContainerObject(contObj, 0);
@@ -1466,6 +1475,15 @@ TickableBlockState {
             if (this.itemContainer == null) {
                 try {
                     this.itemContainer = new SimpleItemContainer((short)1);
+                    // Restore persisted item that survived chunk unload/reload
+                    if (this.savedItemKey != null && !this.savedItemKey.isEmpty() && this.savedItemQuantity > 0) {
+                        try {
+                            ItemStack restored = new ItemStack(this.savedItemKey, this.savedItemQuantity, null);
+                            this.itemContainer.addItemStackToSlot((short)0, restored);
+                        } catch (Throwable ignored) {}
+                        this.savedItemKey = null;
+                        this.savedItemQuantity = 0;
+                    }
                     try {
                         Ev0Log.info(HytaleLogger.getLogger(), "[HopperDiag] created fallback SimpleItemContainer for hopper at pos=" + String.valueOf(this.cachedPosition));
                     }
@@ -3867,6 +3885,27 @@ TickableBlockState {
             .append(new KeyedCodec<Float>("FacadeRotation", Codec.FLOAT, true), (c, v) -> { ((HopperComponent)c).facadeRotation = v == null ? 0 : Math.floorMod(((Float)v).intValue(), 4); }, c -> ((HopperComponent)c).facadeRotation == 0 ? null : Float.valueOf(((HopperComponent)c).facadeRotation)).add()
             .append(new KeyedCodec<Float>("FacadeRotationX", Codec.FLOAT, true), (c, v) -> { ((HopperComponent)c).facadeRotationX = v == null ? 0 : Math.floorMod(((Float)v).intValue(), 4); }, c -> ((HopperComponent)c).facadeRotationX == 0 ? null : Float.valueOf(((HopperComponent)c).facadeRotationX)).add()
             .append(new KeyedCodec<Float>("FacadeRotationZ", Codec.FLOAT, true), (c, v) -> { ((HopperComponent)c).facadeRotationZ = v == null ? 0 : Math.floorMod(((Float)v).intValue(), 4); }, c -> ((HopperComponent)c).facadeRotationZ == 0 ? null : Float.valueOf(((HopperComponent)c).facadeRotationZ)).add()
+            // Persisted item data: survives chunk unload/reload
+            .append(new KeyedCodec<String>("SavedItemKey", Codec.STRING, true), (c, v) -> { ((HopperComponent)c).savedItemKey = (String)v; }, c -> {
+                HopperComponent hc = (HopperComponent)c;
+                if (hc.itemContainer != null) {
+                    try {
+                        ItemStack stack = hc.itemContainer.getItemStack((short)0);
+                        if (stack != null) return stack.getBlockKey();
+                    } catch (Throwable ignored) {}
+                }
+                return hc.savedItemKey;
+            }).add()
+            .append(new KeyedCodec<Float>("SavedItemQuantity", Codec.FLOAT, true), (c, v) -> { ((HopperComponent)c).savedItemQuantity = v == null ? 0 : ((Float)v).intValue(); }, c -> {
+                HopperComponent hc = (HopperComponent)c;
+                if (hc.itemContainer != null) {
+                    try {
+                        ItemStack stack = hc.itemContainer.getItemStack((short)0);
+                        if (stack != null) return Float.valueOf((float)stack.getQuantity());
+                    } catch (Throwable ignored) {}
+                }
+                return hc.savedItemQuantity > 0 ? Float.valueOf((float)hc.savedItemQuantity) : null;
+            }).add()
             .build();
         KNOWN_CONTAINER_COMP_TYPES = null;
         boolean found = false;

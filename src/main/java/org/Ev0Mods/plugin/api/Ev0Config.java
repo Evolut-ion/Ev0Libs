@@ -3,10 +3,10 @@
  */
 package org.Ev0Mods.plugin.api;
 
-import com.hypixel.hytale.logger.HytaleLogger;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.OpenOption;
@@ -14,7 +14,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileAttribute;
 import java.util.Properties;
-import org.Ev0Mods.plugin.api.Ev0Log;
+import java.util.UUID;
+
+import com.hypixel.hytale.logger.HytaleLogger;
 
 public class Ev0Config {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
@@ -22,6 +24,10 @@ public class Ev0Config {
     private static int tierMultiplier = 4;
     private static boolean fluidTransferEnabled = true;
     private static boolean debugMode = false;
+    private static boolean telemetryOptIn = true;
+    private static String telemetryUrl = "https://ev0media.com";
+    private static String telemetrySecret = "";
+    private static String serverId = "";
     private static Path configFilePath = null;
     private static boolean initialized = false;
 
@@ -33,6 +39,17 @@ public class Ev0Config {
         configFilePath = Paths.get(configDirPath, CONFIG_FILE_NAME);
         Ev0Config.loadConfig();
         initialized = true;
+        if (serverId.isBlank()) {
+            try {
+                String host = InetAddress.getLocalHost().getHostName();
+                serverId = host.replaceAll("[^a-zA-Z0-9_-]", "-") + "-"
+                        + UUID.randomUUID().toString().substring(0, 8);
+            } catch (Throwable t) {
+                serverId = "server-" + UUID.randomUUID().toString().substring(0, 8);
+            }
+            Ev0Config.save();
+            Ev0Log.info(LOGGER, "Auto-generated serverId: " + serverId);
+        }
         Ev0Log.info(LOGGER, "Ev0Config initialized from: " + String.valueOf(configFilePath.toAbsolutePath()));
     }
 
@@ -75,18 +92,30 @@ public class Ev0Config {
         if ((debug = props.getProperty("debugMode")) != null) {
             debugMode = Boolean.parseBoolean(debug.trim());
         }
+        String optIn = props.getProperty("telemetryOptIn");
+        if (optIn != null) telemetryOptIn = Boolean.parseBoolean(optIn.trim());
+        String url = props.getProperty("telemetryUrl");
+        if (url != null) telemetryUrl = url.trim();
+        String secret = props.getProperty("telemetrySecret");
+        if (secret != null) telemetrySecret = secret.trim();
+        String sid = props.getProperty("serverId");
+        if (sid != null) serverId = sid.trim();
     }
 
     private static void saveDefaultConfig(Properties props) {
         props.setProperty("tierMultiplier", String.valueOf(tierMultiplier));
         props.setProperty("fluidTransferEnabled", String.valueOf(fluidTransferEnabled));
         props.setProperty("debugMode", String.valueOf(debugMode));
+        props.setProperty("telemetryOptIn", String.valueOf(telemetryOptIn));
+        props.setProperty("telemetryUrl", telemetryUrl);
+        props.setProperty("telemetrySecret", telemetrySecret);
+        props.setProperty("serverId", serverId);
         try {
             if (configFilePath.getParent() != null) {
                 Files.createDirectories(configFilePath.getParent(), new FileAttribute[0]);
             }
             try (OutputStream output = Files.newOutputStream(configFilePath, new OpenOption[0]);){
-                props.store(output, "Ev0Lib Configuration File\n# Edit these values to enable/disable features\n# tierMultiplier: How many items per tier to transfer per tick (default: 4)\n# fluidTransferEnabled: Enable/disable fluid import/export via hoppers (default: true)\n# debugMode: Enable debug logging (default: false)\n# enableLogging: Master switch for all Ev0Lib logging (default: false)");
+                props.store(output, "Ev0Lib Configuration File\n# Edit these values to enable/disable features\n# tierMultiplier: How many items per tier to transfer per tick (default: 4)\n# fluidTransferEnabled: Enable/disable fluid import/export via hoppers (default: true)\n# debugMode: Enable debug logging (default: false)\n# enableLogging: Master switch for all Ev0Lib logging (default: false)\n# telemetryUrl: Backend URL for error/heartbeat/report telemetry (default: ev0smods site)\n# telemetrySecret: Shared secret sent as X-Telemetry-Secret header (leave blank if not set)\n# serverId: Optional identifier for this server instance shown in reports");
             }
         }
         catch (IOException e) {
@@ -112,9 +141,13 @@ public class Ev0Config {
         props.setProperty("tierMultiplier", String.valueOf(tierMultiplier));
         props.setProperty("fluidTransferEnabled", String.valueOf(fluidTransferEnabled));
         props.setProperty("debugMode", String.valueOf(debugMode));
+        props.setProperty("telemetryOptIn", String.valueOf(telemetryOptIn));
+        props.setProperty("telemetryUrl", telemetryUrl);
+        props.setProperty("telemetrySecret", telemetrySecret);
+        props.setProperty("serverId", serverId);
         try {
             try (OutputStream output = Files.newOutputStream(configFilePath, new OpenOption[0]);){
-                props.store(output, "Ev0Lib Configuration File\n# Edit these values to enable/disable features\n# tierMultiplier: How many items per tier to transfer per tick (default: 4)\n# fluidTransferEnabled: Enable/disable fluid import/export via hoppers (default: true)\n# debugMode: Enable debug logging (default: false)\n# enableLogging: Master switch for all Ev0Lib logging (default: false)");
+                props.store(output, "Ev0Lib Configuration File\n# Edit these values to enable/disable features\n# tierMultiplier: How many items per tier to transfer per tick (default: 4)\n# fluidTransferEnabled: Enable/disable fluid import/export via hoppers (default: true)\n# debugMode: Enable debug logging (default: false)\n# enableLogging: Master switch for all Ev0Lib logging (default: false)\n# telemetryOptIn: Master switch for telemetry (default: true). Set to false to disable all telemetry.\n# telemetryUrl: Backend URL for error/heartbeat/report telemetry (default: ev0smods site)\n# telemetrySecret: Shared secret sent as X-Telemetry-Secret header (leave blank if not set)\n# serverId: Optional identifier for this server instance shown in reports");
             }
             Ev0Log.info(LOGGER, "Ev0Config saved");
         }
@@ -137,6 +170,18 @@ public class Ev0Config {
 
     public static boolean isLoggingEnabled() {
         return debugMode;
+    }
+
+    public static String getTelemetryUrl() {
+        return telemetryUrl;
+    }
+
+    public static String getTelemetrySecret() {
+        return telemetrySecret;
+    }
+
+    public static String getServerId() {
+        return serverId;
     }
 
     public static void setTierMultiplier(int value) {
@@ -162,6 +207,17 @@ public class Ev0Config {
 
     public static void setLoggingEnabled(boolean enabled) {
         Ev0Config.setDebugMode(enabled);
+    }
+
+    public static boolean isTelemetryOptIn() {
+        return telemetryOptIn;
+    }
+
+    public static void setTelemetryOptIn(boolean enabled) {
+        telemetryOptIn = enabled;
+        if (initialized) {
+            Ev0Config.save();
+        }
     }
 }
 

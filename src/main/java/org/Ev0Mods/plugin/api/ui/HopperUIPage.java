@@ -52,6 +52,23 @@ public final class HopperUIPage {
     private HopperUIPage() {
     }
 
+    public static void cleanupStaleRefs() {
+        List<PlayerRef> toClean = new ArrayList<>();
+        PLAYER_ENTITY_REFS.forEach((playerRef, storedRef) -> {
+            if (storedRef == null || !storedRef.isValid()) {
+                toClean.add(playerRef);
+            }
+        });
+        for (PlayerRef pr : toClean) {
+            PLAYER_ENTITY_REFS.remove(pr);
+            ACTIVE_TAB.remove(pr);
+            LAST_POS.remove(pr);
+            LINKS_PAGE.remove(pr);
+            String key = pr.toString();
+            COLLECT_GUARD.entrySet().removeIf(e -> e.getKey().startsWith(key + "@"));
+        }
+    }
+
     private static Store<EntityStore> liveStore(PlayerRef playerRef, Store<EntityStore> fallback) {
         try {
             Ref<EntityStore> ref = PLAYER_ENTITY_REFS.get(playerRef);
